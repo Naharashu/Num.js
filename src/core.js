@@ -78,6 +78,19 @@ export function factorial(n) {
   return res
 }
 
+export function reFactorial(n) {
+  let x = 1
+  let fact = 1
+  
+  while (fact < n) {
+    x++
+    fact *= x
+    if (fact === n) return x
+  }
+
+  return (fact === n) ? x : NaN
+}
+
 export function factorize(n) {
   const factors = []
 
@@ -267,6 +280,7 @@ export function multyCarcas(k, n) {
 multyCarcas.revarn = function() {
   return carcas(multyCarcas(1, 3), multyCarcas(2,4))
 }
+
 
 
 // Statistic 
@@ -484,4 +498,6 @@ export class Int128 {
     return '0x' + this.toInt128().toString(16)
   }
 }
+
+
 
