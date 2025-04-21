@@ -1,6 +1,11 @@
 export const e = 2.71828183
 export const y = 0.57721566490153286060651209008240243104215933593992
 export const pi = 3.14159265 
+export const phi = (1 + Math.sqrt(5)) / 2
+export const kninchin = 2.6854520010
+export const plactic = 1.3247179572
+export const apery = 1.2020569032
+export const catalan = 0.9159655941;
 
 export function range(start, end, step = 1){
   let res = []
@@ -11,16 +16,20 @@ export function range(start, end, step = 1){
 }
 
 
+function randin(min, max) {
+  let num = Math.random() * (max - min) + min
+  return num
+}
+
 export function randint(min, max) {
   let num = Math.random() * (max - min) + min
   return num
 }
 
 
-
 export function random() {
-  let b = randint(29992, 93832928289292)
-  let c = randint(0.00000001, 0.111111111111)
+  let b = randin(29992, 93832928289292)
+  let c = randin(0.00000001, 0.111111111111)
   b = Number(b.toFixed(0))
   let seed = Math.random()
   seed = seed + Math.random()
@@ -40,13 +49,21 @@ export function random() {
   
   seed = seed + c
   
-  return (seed + randint(0.00000001, 0.01)) % randint(2, 64)
+  return (seed + randin(0.00000001, 0.01)) % randin(2, 64)
 }
 
 
   
 export function sigmoid(x) {
   return (e**x) / (e**x + 1)
+}
+
+export function Farmi(E, mu=0, T=1, k=1) {
+  return 1 / (1 + Math.exp((E - mu) / (k * T)))
+}
+
+export function gabor(t, f=1) {
+  return (-Math.exp(t**2)) * Math.cos(2 * pi * f * t)
 }
 
 export function factorial(n) {
@@ -76,6 +93,14 @@ export function factorize(n) {
   }
 
   return factors
+}
+
+export function riemann_zeta(s, term=100) {
+  let sum = 0
+  for(let n = 1; n <= term; n++) {
+    sum += 1 / n**s
+  }
+  return sum
 }
 
 export function fibonaci(n) {
@@ -169,6 +194,20 @@ export function broadcast(arr, n) {
   return res
 }
 
+export function logisticMap(x, r = 3.7) {
+  return r * x * (1 - x)
+}
+
+export function crazyTrig(x) {
+  return Math.tan(Math.sin(x))
+}
+
+export function boltzmann(x, x0 = 0, T = 1) {
+  return 1 / (1 + Math.exp(-(x - x0) / T));
+}
+
+
+
 export function relu(x) {
   return Math.max(0, x)
 }
@@ -179,6 +218,24 @@ export function softmax(arr) {
   const sum = exps.reduce((a, b) => a + b,0)
   return exps.map(e => e / sum)
 }
+
+export function softplus(x) {
+  return Math.log(1 + Math.exp(x))
+}
+
+export function softsign(x) {
+  return x / (1 + Math.abs(x))
+}
+
+export function gaussian(x) {
+  return Math.exp(-x * x)
+}
+
+export function sawtooth(x) {
+  return (x - Math.floor(x))
+}
+
+
 
 
 
@@ -426,5 +483,5 @@ export class Int128 {
   hex() {
     return '0x' + this.toInt128().toString(16)
   }
-      
 }
+
