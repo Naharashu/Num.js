@@ -1,4 +1,5 @@
 import * as njs from '../src/core.js'
+import { Matrix } from './num.js'
 
 let a = Matrix.create(2,2,2)
 let b = Matrix.create(2,2,2) 
