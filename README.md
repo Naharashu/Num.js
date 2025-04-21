@@ -9,3 +9,8 @@ Num.js - is compact and fast library with mathematics and physics functions.
 - support work with matrix and 3d Arrays
 - work in browser(without Nodejs)
 - have own random functions
+
+---
+
+Newest version - 1.1.1
+Latest release date - 21.04.25 12:50
