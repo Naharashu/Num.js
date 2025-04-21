@@ -5,7 +5,11 @@ console.log(
 )
 
 console.log(
-  njs.factorial(4) // 24
+  njs.factorial(5) // 120
+)
+
+console.log(
+  njs.reFactorial(120) // 5
 )
 
 console.log(
