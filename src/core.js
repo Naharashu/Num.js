@@ -1,6 +1,12 @@
+// * if any issue please post it on https://github.com/Naharashu/Num.js/issues
+// ! Num.js use stantadr import/export system(not CommonJS)
+// ! All code under IATPL 3.0 License
+// * Made with love by Naharashu
+
+
 export const e = 2.71828183
 export const y = 0.57721566490153286060651209008240243104215933593992
-export const pi = 3.14159265 
+export const pi = 3.14159265
 export const phi = (1 + Math.sqrt(5)) / 2
 export const kninchin = 2.6854520010
 export const plactic = 1.3247179572
@@ -26,6 +32,7 @@ export function randint(min, max) {
   return num
 }
 
+// * is own random and it experimental function
 
 export function random() {
   let b = randin(29992, 93832928289292)
@@ -65,6 +72,28 @@ export function Farmi(E, mu=0, T=1, k=1) {
 export function gabor(t, f=1) {
   return (-Math.exp(t**2)) * Math.cos(2 * pi * f * t)
 }
+
+export function ackermann(m, n) {
+  if (m === 0) return n + 1
+  if (n === 0) return ackermann(m - 1, 1)
+  if (m > 0 && n > 0) {
+    return ackermann(m - 1, ackermann(m, n - 1))
+  }
+}
+
+// ? is you need my functions?
+export function poldan(n, alpha=1.00) {
+  return (n + Math.log(n + 1)) / ((Math.sqrt(n) * alpha) + alpha**2)
+}
+
+export function supreme_poldan(n, w, beta=0.5) {
+  w = Math.log(w)
+  n = w * Math.random() / n
+  n = poldan(n, w) + logWithBase(w, beta)
+
+  return ((w - Math.random()) / n)*beta
+}                          
+
 
 export function factorial(n) {
   let res = n

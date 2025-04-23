@@ -1,3 +1,5 @@
+// * Experimental
+
 import * as njs from '../num.js'
 
 export function sgd(weight, grad, learningRate) {
@@ -13,7 +15,7 @@ export function adam(beta1, beta2, m, grad, η, epsilon, t, w, v) {
 
   w = w - η * mHat / (Math.sqrt(vHat) + epsilon)
 
-  return w
+  return {w, m, v}
 }
 
 export function randomWeights(size) {
@@ -37,6 +39,38 @@ export function elu(x, a=1.0) {
     return a * ((njs.e**x)-1)
   }
 }
+
+export function gelu(x) {
+  return 0.5 * x * (1 + erf(x / Math.sqrt(2)))
+}
+
+export function hardSwish(x) {
+  return x * Math.max(0, Math.min(1, (x + 3) / 6))
+}
+
+export function KLD(p, q) {
+  let res = 0
+  for(let i = 0; i < p.length; i++) {
+    res += p[i] * Math.log(p[i] / q[i])
+  }
+  return res
+}
+
+export function focalLoss(y, ŷ, gamma = 2) {
+  let loss = 0
+  for (let i = 0; i < y.length; i++) {
+    let pt = y[i] * ŷ[i] + (1 - y[i]) * (1 - ŷ[i])
+    loss += -Math.pow(1 - pt, gamma) * Math.log(pt)
+  }
+  return loss / y.length
+}
+
+export function rmsprop(w, grad, cache, decayRate, lr, epsilon = 1e-8) {
+  cache = decayRate * cache + (1 - decayRate) * grad ** 2
+  w = w - lr * grad / (Math.sqrt(cache) + epsilon)
+  return { w, cache }
+}
+
 
 export function mish(x) {
   return njs.tanh(njs.softplus(x))
