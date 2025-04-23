@@ -1,0 +1,24 @@
+{
+  "name": "numjs-library",
+  "version": "1.0.0",
+  "description": "Num.js - is compact and fast library with mathematics and physics functions.",
+  "main": "src/core.js",
+  "directories": {
+    "example": "examples",
+    "src": "src"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["library", "math", "physics", "ai"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com//Naharashu/Num.js.git"
+  },
+  "bugs": {
+    "url": "git+https://github.com/Naharashu/Num.js/issues"
+  },
+  "author": "Naharashu",
+  "license": "IAYPL 3.0"
+}
