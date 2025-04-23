@@ -234,4 +234,6 @@ export function lineDropout(layer, rate= 0.5) {
   return layer.map(x => (Math.random() < rate ? njs.relu(x) : x))
 }
 
-console.log(swish(-1))
+export function crazyDropout(layer, rate = 0.5) {
+  return layer.map(x => (Math.random() < rate ? njs.sigmoid(x) ** elu(x): x))
+}
