@@ -14,4 +14,4 @@ Num.js - is compact and fast library with mathematics and physics functions.
 
 Newest version - 1.2.0
 
-Latest release date - 21.04.25 12:50
+Latest release date - 23.04.25 20:10
