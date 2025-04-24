@@ -59,7 +59,23 @@ export function random() {
   return (seed + randin(0.00000001, 0.01)) % randin(2, 64)
 }
 
+export function root(x, n) {
+  return (x ** (1 / n))
+}
+export function lineFunc(x, a, b) {
+  return a * x + b
+}
 
+export function quadraticFunc(x, a, b, c) {
+  if (a === 0) {
+    lineFunc(x, b, c)
+  }
+  return a * x**2 + b * x + c
+}
+
+export function cubicFunc(x, a, b, c, d) {
+  return a*x**3 + b*x**2 + c*x + d
+}
   
 export function sigmoid(x) {
   return (e**x) / (e**x + 1)
