@@ -1,5 +1,7 @@
 # Num.js
 
+NPM Version 	https://img.shields.io/npm/v/numjs-library
+
 Num.js - is compact and fast library with mathematics and physics functions. 
 
 ### Features:
