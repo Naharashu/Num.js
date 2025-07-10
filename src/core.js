@@ -68,10 +68,21 @@ export function lineFunc(x, a, b) {
 
 export function quadraticFunc(x, a, b, c) {
   if (a === 0) {
-    lineFunc(x, b, c)
+    return lineFunc(x, b, c)
   }
   return a * x**2 + b * x + c
 }
+
+export function isOdd(a) {
+  a = Number(a);
+  return a % 2 == 0 ? false : true;
+}
+
+export function isEven(a) {
+  a = Number(a);
+  return a % 2 == 0 ? true : false;
+}
+
 
 export function cubicFunc(x, a, b, c, d) {
   return a*x**3 + b*x**2 + c*x + d
@@ -161,9 +172,9 @@ export function riemann_zeta(s, term=100) {
   return sum
 }
 
-export function fibonaci(n) {
+export function fibonacci(n) {
   if (n <= 1) return n
-  return fibonaci(n - 1) + fibonaci(n - 2)
+  return fibonacci(n - 1) + fibonacci(n - 2)
 }
 
 export function lambert(y) {
@@ -493,7 +504,7 @@ export class Array3d {
     
     for(let i = 0; i < a.length; i++) {
       for(let j = 0; j < a[0].length; j++) {
-        for(let t; t < a[0][0].length; t++) {
+        for(let t = 0; t < a[0][0].length; t++) {
           if(a[i][j] !== b[i][j]) return false
       }
       }
@@ -507,6 +518,42 @@ export class Array3d {
           for (let j = 0; j < a[0].length; j++) {
             for(let t = 0; t < a[0][0].length; t++) {
             res[i][j][t] = a[i][j][t] * b
+            }
+          }
+        }
+      return res
+  }
+
+  static divBy(a, b) {
+    let res = Array3d.create(a.length, a[0].length, a[0][0].length)
+        for (let i = 0; i < a.length; i++) {
+          for (let j = 0; j < a[0].length; j++) {
+            for(let t = 0; t < a[0][0].length; t++) {
+            res[i][j][t] = a[i][j][t] / b
+            }
+          }
+        }
+      return res
+  }
+  
+  static add(a, b) {
+    let res = Array3d.create(a.length, a[0].length, a[0][0].length)
+        for (let i = 0; i < a.length; i++) {
+          for (let j = 0; j < a[0].length; j++) {
+            for(let t = 0; t < a[0][0].length; t++) {
+            res[i][j][t] = a[i][j][t] + b
+            }
+          }
+        }
+      return res
+  }
+
+  static sub(a, b) {
+    let res = Array3d.create(a.length, a[0].length, a[0][0].length)
+        for (let i = 0; i < a.length; i++) {
+          for (let j = 0; j < a[0].length; j++) {
+            for(let t = 0; t < a[0][0].length; t++) {
+            res[i][j][t] = a[i][j][t] - b
             }
           }
         }
@@ -541,6 +588,27 @@ export class Int128 {
   
   hex() {
     return '0x' + this.toInt128().toString(16)
+  }
+
+  static addI128(a, b) {
+    const lo = a.lo + b.lo;
+    const carry = lo >> 64n;
+    const hi = a.hi + b.hi + carry;
+    return new Int128(hi, lo & ((1n << 64n) - 1n));
+  }
+
+  static subI128(a, b) {
+    let lo = a.lo - b.lo;
+    let borrow = 0n;
+
+    if (lo < 0n) {
+      lo += 1n << 64n;
+      borrow = 1n;
+    }
+
+    const hi = a.hi - b.hi - borrow;
+
+    return new Int128(hi, lo);
   }
 }
 
