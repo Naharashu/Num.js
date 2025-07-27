@@ -1,6 +1,6 @@
 // * Experimental
 
-import * as njs from '../num.js'
+import * as njs from './core.js'
 
 export function sgd(weight, grad, learningRate) {
   return weight - learningRate * grad
@@ -124,7 +124,7 @@ export function MSE_grad(y,ŷ) {
   let n = y.length
   let a = 0
   for (let i = 0; i < y.length; i++){
-    a += (ŷ[i] - y[i])**2
+    a += (ŷ[i] - y[i])
   }
   return (2 / n) * a
 }
