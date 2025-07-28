@@ -4,8 +4,8 @@ import {
   isNumericArray,
   isNumericMatrix,
   isComplexNumber,
-  MATH_CONSTANTS,
 } from "../types/common.js";
+import { MATH_CONSTANTS } from "../core/constants.js";
 import {
   isMatrixLike,
   isNumericMatrixLike,

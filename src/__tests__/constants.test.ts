@@ -9,7 +9,7 @@ import {
   PI,
   SQRT1_2,
   SQRT2,
-  
+
   // Extended constants
   EULER,
   PI_HIGH_PRECISION,
@@ -18,7 +18,7 @@ import {
   PI_4,
   TWO_PI,
   TWO_SQRTPI,
-  
+
   // Special constants
   PHI,
   EULER_MASCHERONI,
@@ -29,12 +29,12 @@ import {
   GLAISHER_KINKELIN,
   CONWAY,
   MILLS,
-  
+
   // Physical constants
   FINE_STRUCTURE,
   FEIGENBAUM_DELTA,
   FEIGENBAUM_ALPHA,
-  
+
   // Computational constants
   EPSILON,
   MAX_SAFE_INTEGER,
@@ -43,28 +43,26 @@ import {
   MIN_VALUE,
   POSITIVE_INFINITY,
   NEGATIVE_INFINITY,
-  
+
   // Angle conversion
   DEG_TO_RAD,
   RAD_TO_DEG,
-  
+
   // Logarithmic constants
   LN_PI,
   LN_2PI,
   LN_SQRT_2PI,
   LOG10_2,
   LOG10_PI,
-  
+
   // Square root constants
   SQRT3,
   SQRT5,
   SQRT_PI,
   SQRT_2PI,
   INV_SQRT_2PI,
-  
-  // Comprehensive object
-  MATH_CONSTANTS,
-  
+
+
   // Legacy aliases
   e,
   pi,
@@ -74,13 +72,15 @@ import {
   plactic,
   apery,
   catalan,
-  
+
   // Utility functions
   isApproximatelyEqual,
   getConstantName,
   degreesToRadians,
   radiansToDegrees,
 } from "../core/constants.js";
+import { MATH_CONSTANTS } from "../core/constants.js";
+
 
 describe("Mathematical Constants", () => {
   describe("Standard Constants", () => {
@@ -136,7 +136,7 @@ describe("Mathematical Constants", () => {
       // φ = (1 + √5) / 2
       const calculatedPhi = (1 + Math.sqrt(5)) / 2;
       expect(PHI).toBeCloseTo(calculatedPhi, 15);
-      
+
       // φ² = φ + 1
       expect(PHI * PHI).toBeCloseTo(PHI + 1, 10);
     });
@@ -351,7 +351,7 @@ describe("Mathematical Constants", () => {
     test("should work with TypeScript strict mode", () => {
       const constantValue: number = PI;
       expect(typeof constantValue).toBe('number');
-      
+
       const constantsObject: typeof MATH_CONSTANTS = MATH_CONSTANTS;
       expect(typeof constantsObject.E).toBe('number');
     });

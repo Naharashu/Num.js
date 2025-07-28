@@ -189,31 +189,8 @@ export function isComplexNumber(value: unknown): value is ComplexNumber {
 }
 
 // ============================================================================
-// Constants
+// Constants (Re-exported from constants.ts for convenience)
 // ============================================================================
 
-/** Mathematical constants with proper typing */
-export const MATH_CONSTANTS = {
-    /** Euler's number */
-    E: Math.E,
-    /** Natural logarithm of 2 */
-    LN2: Math.LN2,
-    /** Natural logarithm of 10 */
-    LN10: Math.LN10,
-    /** Base 2 logarithm of E */
-    LOG2E: Math.LOG2E,
-    /** Base 10 logarithm of E */
-    LOG10E: Math.LOG10E,
-    /** Pi */
-    PI: Math.PI,
-    /** Square root of 1/2 */
-    SQRT1_2: Math.SQRT1_2,
-    /** Square root of 2 */
-    SQRT2: Math.SQRT2,
-    /** Machine epsilon for floating point comparison */
-    EPSILON: Number.EPSILON,
-    /** Maximum safe integer */
-    MAX_SAFE_INTEGER: Number.MAX_SAFE_INTEGER,
-    /** Minimum safe integer */
-    MIN_SAFE_INTEGER: Number.MIN_SAFE_INTEGER,
-} as const;
+// Re-export the comprehensive MATH_CONSTANTS from constants.ts
+export { MATH_CONSTANTS } from '../core/constants.js';
