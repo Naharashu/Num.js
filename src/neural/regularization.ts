@@ -178,3 +178,88 @@ export function applyWeightDecay(weights: NumericArray, weightDecay: number): Nu
   
   return weights.map(weight => weight * (1 - weightDecay));
 }
+
+/**
+ * L3 regularization - adds penalty equal to sum of cubed absolute values of parameters
+ * @param weights - Array of weight values
+ * @param lambda - Regularization strength (must be non-negative)
+ * @returns L3 regularization penalty
+ */
+export function l3Regularization(weights: NumericArray, lambda: number): number {
+  if (lambda < 0) {
+    throw new InvalidParameterError('Lambda must be non-negative', 'l3Regularization', { lambda });
+  }
+  
+  return lambda * weights.reduce((sum, weight) => sum + Math.pow(Math.abs(weight), 3), 0);
+}
+
+/**
+ * L3 regularization gradient
+ * @param weights - Array of weight values
+ * @param lambda - Regularization strength
+ * @returns Gradient of L3 regularization
+ */
+export function l3RegularizationGradient(weights: NumericArray, lambda: number): NumericArray {
+  if (lambda < 0) {
+    throw new InvalidParameterError('Lambda must be non-negative', 'l3RegularizationGradient', { lambda });
+  }
+  
+  return weights.map(weight => {
+    const sign = Math.sign(weight);
+    return lambda * 3 * sign * weight * weight;
+  });
+}
+
+/**
+ * Soft dropout - applies dropout with scaling instead of zeroing
+ * @param layer - Input layer
+ * @param rate - Dropout rate (0-1)
+ * @param scale - Scale factor for dropped elements (default: 0.2)
+ * @returns Layer with soft dropout applied
+ */
+export function softDropout(layer: NumericArray, rate: number = 0.5, scale: number = 0.2): NumericArray {
+  if (rate < 0 || rate > 1) {
+    throw new InvalidParameterError('Dropout rate must be between 0 and 1', 'softDropout', { rate });
+  }
+  
+  if (scale < 0 || scale > 1) {
+    throw new InvalidParameterError('Scale must be between 0 and 1', 'softDropout', { scale });
+  }
+  
+  return layer.map(x => Math.random() < rate ? x * scale : x);
+}
+
+/**
+ * Line dropout - applies ReLU to dropped elements
+ * @param layer - Input layer
+ * @param rate - Dropout rate (0-1)
+ * @returns Layer with line dropout applied
+ */
+export function lineDropout(layer: NumericArray, rate: number = 0.5): NumericArray {
+  if (rate < 0 || rate > 1) {
+    throw new InvalidParameterError('Dropout rate must be between 0 and 1', 'lineDropout', { rate });
+  }
+  
+  return layer.map(x => Math.random() < rate ? Math.max(0, x) : x);
+}
+
+/**
+ * Crazy dropout - applies sigmoid^elu to dropped elements
+ * @param layer - Input layer
+ * @param rate - Dropout rate (0-1)
+ * @returns Layer with crazy dropout applied
+ */
+export function crazyDropout(layer: NumericArray, rate: number = 0.5): NumericArray {
+  if (rate < 0 || rate > 1) {
+    throw new InvalidParameterError('Dropout rate must be between 0 and 1', 'crazyDropout', { rate });
+  }
+  
+  return layer.map(x => {
+    if (Math.random() < rate) {
+      const sigmoidX = 1 / (1 + Math.exp(-x));
+      const eluX = x > 0 ? x : (Math.exp(x) - 1);
+      return Math.pow(sigmoidX, eluX);
+    }
+    return x;
+  });
+}

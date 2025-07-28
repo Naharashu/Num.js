@@ -4,13 +4,14 @@
  */
 
 import type { NumericArray } from '../types/common.js';
-import { 
-  InvalidParameterError, 
-  MathematicalError 
+import {
+  InvalidParameterError,
+  MathematicalError
 } from '../types/errors.js';
-import { 
+import {
   validateFiniteNumber,
-  validateNumericArray 
+  validateNumericArray,
+  validatePositiveInteger
 } from '../types/validation.js';
 
 // ============================================================================
@@ -94,11 +95,11 @@ export function leakyReluDerivative(x: number, alpha: number = 0.01): number {
  */
 export const sigmoid: ActivationFunction = (x: number): number => {
   validateFiniteNumber(x, 'x');
-  
+
   // Prevent overflow for very large negative values
   if (x < -500) return 0;
   if (x > 500) return 1;
-  
+
   return 1 / (1 + Math.exp(-x));
 };
 
@@ -153,7 +154,7 @@ export const tanhDerivative: DerivativeFunction = (x: number): number => {
 export function elu(x: number, alpha: number = 1.0): number {
   validateFiniteNumber(x, 'x');
   validateFiniteNumber(alpha, 'alpha');
-  
+
   if (x > 0) {
     return x;
   } else {
@@ -170,7 +171,7 @@ export function elu(x: number, alpha: number = 1.0): number {
 export function eluDerivative(x: number, alpha: number = 1.0): number {
   validateFiniteNumber(x, 'x');
   validateFiniteNumber(alpha, 'alpha');
-  
+
   if (x > 0) {
     return 1;
   } else {
@@ -185,10 +186,10 @@ export function eluDerivative(x: number, alpha: number = 1.0): number {
  */
 export function selu(x: number): number {
   validateFiniteNumber(x, 'x');
-  
+
   const alpha = 1.6732632423543772848170429916717;
   const scale = 1.0507009873554804934193349852946;
-  
+
   if (x > 0) {
     return scale * x;
   } else {
@@ -209,7 +210,7 @@ export function selu(x: number): number {
 export function swish(x: number, beta: number = 1.0): number {
   validateFiniteNumber(x, 'x');
   validateFiniteNumber(beta, 'beta');
-  
+
   return x * sigmoid(beta * x);
 }
 
@@ -233,7 +234,7 @@ export const silu: ActivationFunction = (x: number): number => {
  */
 export function gelu(x: number): number {
   validateFiniteNumber(x, 'x');
-  
+
   return 0.5 * x * (1 + erf(x / Math.sqrt(2)));
 }
 
@@ -248,7 +249,7 @@ export function gelu(x: number): number {
  */
 export function mish(x: number): number {
   validateFiniteNumber(x, 'x');
-  
+
   const softplusX = Math.log(1 + Math.exp(x));
   return x * Math.tanh(softplusX);
 }
@@ -265,7 +266,7 @@ export function mish(x: number): number {
  */
 export function hardSwish(x: number): number {
   validateFiniteNumber(x, 'x');
-  
+
   return x * Math.max(0, Math.min(1, (x + 3) / 6));
 }
 
@@ -278,11 +279,11 @@ export function hardSwish(x: number): number {
 export function squarePlus(x: number, b: number = 4): number {
   validateFiniteNumber(x, 'x');
   validateFiniteNumber(b, 'b');
-  
+
   if (b < 0) {
     throw new InvalidParameterError('b', 'non-negative number', b);
   }
-  
+
   return (x + Math.sqrt(x * x + b)) / 2;
 }
 
@@ -301,16 +302,16 @@ export function squarePlus(x: number, b: number = 4): number {
  */
 export const softmax: ActivationArrayFunction = (arr: NumericArray): NumericArray => {
   validateNumericArray(arr, 'arr');
-  
+
   if (arr.length === 0) {
     throw new InvalidParameterError('arr', 'non-empty array', arr);
   }
-  
+
   // Subtract max for numerical stability
   const max = Math.max(...arr);
   const exps: NumericArray = [];
   let sum = 0;
-  
+
   for (let i = 0; i < arr.length; i++) {
     const value = arr[i];
     if (value === undefined) {
@@ -320,11 +321,11 @@ export const softmax: ActivationArrayFunction = (arr: NumericArray): NumericArra
     exps.push(exp);
     sum += exp;
   }
-  
+
   if (sum === 0) {
     throw new MathematicalError('Softmax sum is zero', 'softmax');
   }
-  
+
   return exps.map(e => e / sum);
 };
 
@@ -338,15 +339,15 @@ export const softmax: ActivationArrayFunction = (arr: NumericArray): NumericArra
  */
 export function logSoftmax(arr: NumericArray): NumericArray {
   validateNumericArray(arr, 'arr');
-  
+
   if (arr.length === 0) {
     throw new InvalidParameterError('arr', 'non-empty array', arr);
   }
-  
+
   // Subtract max for numerical stability
   const max = Math.max(...arr);
   let logSumExp = 0;
-  
+
   // Calculate log(sum(exp(x_i - max)))
   for (let i = 0; i < arr.length; i++) {
     const value = arr[i];
@@ -356,7 +357,7 @@ export function logSoftmax(arr: NumericArray): NumericArray {
     logSumExp += Math.exp(value - max);
   }
   logSumExp = Math.log(logSumExp);
-  
+
   // Calculate log softmax
   const result: NumericArray = [];
   for (let i = 0; i < arr.length; i++) {
@@ -366,7 +367,7 @@ export function logSoftmax(arr: NumericArray): NumericArray {
     }
     result.push(value - max - logSumExp);
   }
-  
+
   return result;
 }
 
@@ -381,11 +382,11 @@ export function logSoftmax(arr: NumericArray): NumericArray {
  * applyActivation([0, 1, -1], sigmoid) // [0.5, 0.731, 0.269]
  */
 export function applyActivation(
-  arr: NumericArray, 
+  arr: NumericArray,
   activationFn: ActivationFunction
 ): NumericArray {
   validateNumericArray(arr, 'arr');
-  
+
   const result: NumericArray = [];
   for (let i = 0; i < arr.length; i++) {
     const value = arr[i];
@@ -394,7 +395,7 @@ export function applyActivation(
     }
     result.push(activationFn(value));
   }
-  
+
   return result;
 }
 
@@ -409,19 +410,19 @@ export function applyActivation(
  */
 function erf(x: number): number {
   // Abramowitz and Stegun approximation
-  const a1 =  0.254829592;
+  const a1 = 0.254829592;
   const a2 = -0.284496736;
-  const a3 =  1.421413741;
+  const a3 = 1.421413741;
   const a4 = -1.453152027;
-  const a5 =  1.061405429;
-  const p  =  0.3275911;
-  
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+
   const sign = x >= 0 ? 1 : -1;
   x = Math.abs(x);
-  
+
   const t = 1.0 / (1.0 + p * x);
   const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-  
+
   return sign * y;
 }
 
@@ -449,17 +450,17 @@ export function getActivationFunction(name: string): ActivationFunction {
     'squareplus': (x: number) => squarePlus(x),
     'leakyrelu': (x: number) => leakyRelu(x),
   };
-  
+
   const fn = activations[name.toLowerCase()];
   if (!fn) {
     throw new InvalidParameterError(
-      'name', 
-      'valid activation function name', 
+      'name',
+      'valid activation function name',
       name,
       `Available functions: ${Object.keys(activations).join(', ')}`
     );
   }
-  
+
   return fn;
 }
 
@@ -480,16 +481,82 @@ export function getDerivativeFunction(name: string): DerivativeFunction {
     'elu': (x: number) => eluDerivative(x),
     'leakyrelu': (x: number) => leakyReluDerivative(x),
   };
-  
+
   const fn = derivatives[name.toLowerCase()];
   if (!fn) {
     throw new InvalidParameterError(
-      'name', 
-      'activation function with available derivative', 
+      'name',
+      'activation function with available derivative',
       name,
       `Available derivatives: ${Object.keys(derivatives).join(', ')}`
     );
   }
-  
+
   return fn;
+}
+
+// ============================================================================
+// Additional Neural Network Utility Functions
+// ============================================================================
+
+/**
+ * Generate random weights for neural network initialization
+ * @param size - Number of weights to generate
+ * @param min - Minimum weight value (default: -0.5)
+ * @param max - Maximum weight value (default: 0.5)
+ * @returns Array of random weights
+ * 
+ * @example
+ * randomWeights(5) // [-0.2, 0.1, -0.4, 0.3, 0.0]
+ */
+export function randomWeights(size: number, min: number = -0.5, max: number = 0.5): NumericArray {
+  validatePositiveInteger(size, 'size');
+  validateFiniteNumber(min, 'min');
+  validateFiniteNumber(max, 'max');
+
+  if (min >= max) {
+    throw new InvalidParameterError('min', 'less than max', min);
+  }
+
+  return Array.from({ length: size }, () => Math.random() * (max - min) + min);
+}
+
+/**
+ * Simple prediction function using sigmoid
+ * @param w - Weight
+ * @param x - Input
+ * @param b - Bias
+ * @returns Prediction using sigmoid(w*x + b)
+ * 
+ * @example
+ * forecast(0.5, 2, 0.1) // sigmoid(0.5*2 + 0.1)
+ */
+export function forecast(w: number, x: number, b: number): number {
+  validateFiniteNumber(w, 'w');
+  validateFiniteNumber(x, 'x');
+  validateFiniteNumber(b, 'b');
+
+  return sigmoid(w * x + b);
+}
+
+/**
+ * Min-max normalization
+ * @param data - Array of data to normalize
+ * @returns Normalized array with values between 0 and 1
+ * 
+ * @example
+ * normalize([1, 2, 3, 4, 5]) // [0, 0.25, 0.5, 0.75, 1]
+ */
+export function normalize(data: NumericArray): NumericArray {
+  validateNumericArray(data, 'data');
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+
+  if (min === max) {
+    // All values are the same, return array of zeros
+    return new Array(data.length).fill(0);
+  }
+
+  return data.map(value => (value - min) / (max - min));
 }

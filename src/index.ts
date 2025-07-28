@@ -47,11 +47,50 @@ export {
   range,
   randin,
   randint,
+  random,
   root,
   factorial,
   fibonacci,
   sigmoid,
-  softmax
+  softmax,
+  lineFunc,
+  quadraticFunc,
+  cubicFunc,
+  isOdd,
+  isEven,
+  isPrime,
+  factorize,
+  reFactorial,
+  logWithBase,
+  sinh,
+  cosh,
+  cth,
+  sech,
+  csch,
+  riemann_zeta,
+  gamma,
+  beta,
+  lambert,
+  gauss,
+  Farmi,
+  gabor,
+  ackermann,
+  boltzmann,
+  logisticMap,
+  crazyTrig,
+  poldan,
+  supreme_poldan,
+  broadcast,
+  softplus,
+  softsign,
+  gaussian,
+  sawtooth,
+  carcas,
+  carcasRevarn,
+  carcasVoid,
+  carcasVoidless,
+  multyCarcas,
+  multyCarcasRevarn
 } from './core/basic-math.js';
 
 export {
@@ -121,6 +160,20 @@ export { Matrix } from './matrix/Matrix.js';
 export { Array3d } from './matrix/Array3d.js';
 
 // ============================================================================
+// Specialized Data Types
+// ============================================================================
+
+export { 
+  Int128, 
+  fromNumber as int128FromNumber, 
+  fromString as int128FromString,
+  INT128_ZERO,
+  INT128_ONE,
+  INT128_MAX,
+  INT128_MIN
+} from './core/int128.js';
+
+// ============================================================================
 // Neural Network Functions
 // ============================================================================
 
@@ -152,7 +205,10 @@ export {
   logSoftmax,
   applyActivation,
   getActivationFunction,
-  getDerivativeFunction
+  getDerivativeFunction,
+  randomWeights,
+  forecast,
+  normalize
 } from './neural/activations.js';
 
 export type {
@@ -195,13 +251,18 @@ export {
   l1RegularizationGradient,
   l2Regularization,
   l2RegularizationGradient,
+  l3Regularization,
+  l3RegularizationGradient,
   elasticNetRegularization,
   elasticNetRegularizationGradient,
   dropout,
   invertedDropout,
   batchNormalization,
   layerNormalization,
-  applyWeightDecay
+  applyWeightDecay,
+  softDropout,
+  lineDropout,
+  crazyDropout
 } from './neural/regularization.js';
 
 // ============================================================================
