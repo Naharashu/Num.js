@@ -21,6 +21,19 @@ import {
   correlation,
   summary,
   histogram,
+  // Advanced functions
+  percentiles,
+  quantiles,
+  coefficientOfVariation,
+  geometricMean,
+  harmonicMean,
+  rootMeanSquare,
+  correlationMatrix,
+  covarianceMatrix,
+  medianAbsoluteDeviation,
+  trimmedMean,
+  jarqueBeraTest,
+  andersonDarlingTest,
 } from "../core/statistics";
 import { 
   InvalidParameterError, 
@@ -446,6 +459,276 @@ describe("Edge Cases and Error Handling", () => {
   });
 });
 
+describe("Advanced Statistical Functions", () => {
+  describe("percentiles", () => {
+    test("should calculate multiple percentiles", () => {
+      const data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      const result = percentiles(data, [25, 50, 75]);
+      
+      expect(result).toHaveLength(3);
+      expect(result[0]).toBeCloseTo(3.25, 1);
+      expect(result[1]).toBeCloseTo(5.5, 1);
+      expect(result[2]).toBeCloseTo(7.75, 1);
+    });
+
+    test("should throw for invalid percentiles", () => {
+      expect(() => percentiles([1, 2, 3], [-1, 50])).toThrow(InvalidParameterError);
+      expect(() => percentiles([1, 2, 3], [50, 101])).toThrow(InvalidParameterError);
+    });
+  });
+
+  describe("quantiles", () => {
+    test("should calculate multiple quantiles", () => {
+      const data = [1, 2, 3, 4, 5];
+      const result = quantiles(data, [0.25, 0.5, 0.75]);
+      
+      expect(result).toHaveLength(3);
+      expect(result[1]).toBe(3); // median
+    });
+
+    test("should throw for invalid quantiles", () => {
+      expect(() => quantiles([1, 2, 3], [-0.1, 0.5])).toThrow(InvalidParameterError);
+      expect(() => quantiles([1, 2, 3], [0.5, 1.1])).toThrow(InvalidParameterError);
+    });
+  });
+
+  describe("coefficientOfVariation", () => {
+    test("should calculate coefficient of variation", () => {
+      const data = [1, 2, 3, 4, 5];
+      const cv = coefficientOfVariation(data);
+      
+      expect(cv).toBeGreaterThan(0);
+      expect(cv).toBeLessThan(1);
+    });
+
+    test("should throw for zero mean", () => {
+      const data = [-1, 0, 1];
+      expect(() => coefficientOfVariation(data)).toThrow(MathematicalError);
+    });
+  });
+
+  describe("geometricMean", () => {
+    test("should calculate geometric mean", () => {
+      expect(geometricMean([1, 2, 4, 8])).toBeCloseTo(2.828, 2);
+      expect(geometricMean([1, 1, 1])).toBe(1);
+      expect(geometricMean([2, 8])).toBe(4);
+    });
+
+    test("should throw for non-positive values", () => {
+      expect(() => geometricMean([1, 0, 3])).toThrow(InvalidParameterError);
+      expect(() => geometricMean([1, -2, 3])).toThrow(InvalidParameterError);
+    });
+
+    test("should throw for empty array", () => {
+      expect(() => geometricMean([])).toThrow(EmptyArrayError);
+    });
+  });
+
+  describe("harmonicMean", () => {
+    test("should calculate harmonic mean", () => {
+      expect(harmonicMean([1, 2, 4])).toBeCloseTo(1.714, 2);
+      expect(harmonicMean([2, 2, 2])).toBe(2);
+    });
+
+    test("should throw for zero values", () => {
+      expect(() => harmonicMean([1, 0, 3])).toThrow(InvalidParameterError);
+    });
+
+    test("should throw for empty array", () => {
+      expect(() => harmonicMean([])).toThrow(EmptyArrayError);
+    });
+  });
+
+  describe("rootMeanSquare", () => {
+    test("should calculate RMS", () => {
+      expect(rootMeanSquare([1, 2, 3, 4, 5])).toBeCloseTo(3.317, 2);
+      expect(rootMeanSquare([3, 4])).toBeCloseTo(3.536, 2); // sqrt((9+16)/2) = sqrt(12.5) = 3.536
+    });
+
+    test("should handle negative values", () => {
+      expect(rootMeanSquare([-1, 1])).toBe(1); // sqrt((1+1)/2) = 1
+    });
+
+    test("should throw for empty array", () => {
+      expect(() => rootMeanSquare([])).toThrow(EmptyArrayError);
+    });
+  });
+});
+
+describe("Matrix Statistical Functions", () => {
+  describe("correlationMatrix", () => {
+    test("should calculate correlation matrix", () => {
+      const data = [
+        [1, 2],
+        [2, 4],
+        [3, 6]
+      ];
+      const corrMatrix = correlationMatrix(data);
+      
+      expect(corrMatrix).toHaveLength(2);
+      expect(corrMatrix[0]).toHaveLength(2);
+      expect(corrMatrix[0]![0]).toBe(1); // Perfect correlation with itself
+      expect(corrMatrix[1]![1]).toBe(1); // Perfect correlation with itself
+      expect(corrMatrix[0]![1]).toBeCloseTo(1, 10); // Perfect positive correlation
+      expect(corrMatrix[1]![0]).toBeCloseTo(1, 10); // Symmetric
+    });
+
+    test("should handle uncorrelated variables", () => {
+      const data = [
+        [1, 1],
+        [2, 4],
+        [3, 2],
+        [4, 3]
+      ];
+      const corrMatrix = correlationMatrix(data);
+      
+      expect(corrMatrix[0]![0]).toBe(1);
+      expect(corrMatrix[1]![1]).toBe(1);
+      expect(Math.abs(corrMatrix[0]![1]!)).toBeLessThan(1); // Not perfect correlation
+    });
+
+    test("should throw for empty matrix", () => {
+      expect(() => correlationMatrix([])).toThrow(EmptyArrayError);
+    });
+  });
+
+  describe("covarianceMatrix", () => {
+    test("should calculate covariance matrix", () => {
+      const data = [
+        [1, 2],
+        [2, 4],
+        [3, 6]
+      ];
+      const covMatrix = covarianceMatrix(data);
+      
+      expect(covMatrix).toHaveLength(2);
+      expect(covMatrix[0]).toHaveLength(2);
+      expect(covMatrix[0]![0]).toBeGreaterThan(0); // Positive variance
+      expect(covMatrix[1]![1]).toBeGreaterThan(0); // Positive variance
+      expect(covMatrix[0]![1]).toBe(covMatrix[1]![0]!); // Symmetric
+    });
+
+    test("should handle sample covariance with ddof", () => {
+      const data = [
+        [1, 2],
+        [2, 4],
+        [3, 6]
+      ];
+      const popCov = covarianceMatrix(data);
+      const sampleCov = covarianceMatrix(data, { ddof: 1 });
+      
+      expect(sampleCov[0]![0]!).toBeGreaterThan(popCov[0]![0]!); // Sample variance > population variance
+    });
+
+    test("should throw for empty matrix", () => {
+      expect(() => covarianceMatrix([])).toThrow(EmptyArrayError);
+    });
+  });
+});
+
+describe("Robust Statistics", () => {
+  describe("medianAbsoluteDeviation", () => {
+    test("should calculate MAD", () => {
+      const data = [1, 2, 3, 4, 5];
+      const mad = medianAbsoluteDeviation(data);
+      
+      expect(mad).toBeGreaterThan(0);
+      expect(typeof mad).toBe('number');
+    });
+
+    test("should handle outliers better than standard deviation", () => {
+      const normalData = [1, 2, 3, 4, 5];
+      const dataWithOutlier = [1, 2, 3, 4, 100];
+      
+      const madNormal = medianAbsoluteDeviation(normalData);
+      const madOutlier = medianAbsoluteDeviation(dataWithOutlier);
+      const stdNormal = standardDeviation(normalData);
+      const stdOutlier = standardDeviation(dataWithOutlier);
+      
+      // MAD should be less affected by outliers than standard deviation
+      const madRatio = madOutlier / madNormal;
+      const stdRatio = stdOutlier / stdNormal;
+      
+      expect(madRatio).toBeLessThan(stdRatio);
+    });
+
+    test("should throw for empty array", () => {
+      expect(() => medianAbsoluteDeviation([])).toThrow(EmptyArrayError);
+    });
+  });
+
+  describe("trimmedMean", () => {
+    test("should calculate trimmed mean", () => {
+      const data = [1, 2, 3, 4, 100]; // 100 is an outlier
+      const trimmed = trimmedMean(data, 20); // Remove 20% from each end
+      const regular = mean(data);
+      
+      expect(trimmed).toBeLessThan(regular); // Should be less affected by outlier
+      expect(trimmed).toBeGreaterThan(2);
+      expect(trimmed).toBeLessThan(4);
+    });
+
+    test("should throw for invalid trim percentage", () => {
+      expect(() => trimmedMean([1, 2, 3], -5)).toThrow(InvalidParameterError);
+      expect(() => trimmedMean([1, 2, 3], 60)).toThrow(InvalidParameterError);
+    });
+
+    test("should throw for excessive trimming", () => {
+      expect(() => trimmedMean([1, 2], 50)).toThrow(InvalidParameterError);
+    });
+
+    test("should throw for empty array", () => {
+      expect(() => trimmedMean([], 10)).toThrow(EmptyArrayError);
+    });
+  });
+});
+
+describe("Distribution Testing", () => {
+  describe("jarqueBeraTest", () => {
+    test("should calculate Jarque-Bera statistic", () => {
+      const normalishData = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      const jb = jarqueBeraTest(normalishData);
+      
+      expect(typeof jb).toBe('number');
+      expect(jb).toBeGreaterThanOrEqual(0);
+    });
+
+    test("should be low for normal-like data", () => {
+      // Generate somewhat normal-like data
+      const normalData = [2, 3, 4, 4, 5, 5, 5, 6, 6, 7];
+      const jb = jarqueBeraTest(normalData);
+      
+      expect(jb).toBeGreaterThanOrEqual(0);
+      expect(jb).toBeLessThan(10); // Should be relatively low for normal-ish data
+    });
+
+    test("should throw for insufficient data", () => {
+      expect(() => jarqueBeraTest([1, 2, 3])).toThrow(InvalidParameterError);
+    });
+  });
+
+  describe("andersonDarlingTest", () => {
+    test("should calculate Anderson-Darling statistic", () => {
+      const data = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      const ad = andersonDarlingTest(data);
+      
+      expect(typeof ad).toBe('number');
+      expect(Number.isFinite(ad)).toBe(true);
+    });
+
+    test("should handle normal-like data", () => {
+      const normalData = [2, 3, 4, 4, 5, 5, 5, 6, 6, 7];
+      const ad = andersonDarlingTest(normalData);
+      
+      expect(Number.isFinite(ad)).toBe(true);
+    });
+
+    test("should throw for insufficient data", () => {
+      expect(() => andersonDarlingTest([1, 2])).toThrow(InvalidParameterError);
+    });
+  });
+});
+
 describe("Type Safety", () => {
   test("should work with TypeScript strict mode", () => {
     const data: number[] = [1, 2, 3, 4, 5];
@@ -468,5 +751,21 @@ describe("Type Safety", () => {
       expect(Array.isArray(modeResult)).toBe(true);
       expect(modeResult.every(x => typeof x === 'number')).toBe(true);
     }
+  });
+
+  test("should maintain type safety with advanced functions", () => {
+    const data: number[] = [1, 2, 3, 4, 5];
+    const matrix: number[][] = [[1, 2], [3, 4], [5, 6]];
+    
+    const geomMean: number = geometricMean(data);
+    const harmMean: number = harmonicMean(data);
+    const rms: number = rootMeanSquare(data);
+    const corrMatrix: number[][] = correlationMatrix(matrix);
+    
+    expect(typeof geomMean).toBe('number');
+    expect(typeof harmMean).toBe('number');
+    expect(typeof rms).toBe('number');
+    expect(Array.isArray(corrMatrix)).toBe(true);
+    expect(Array.isArray(corrMatrix[0])).toBe(true);
   });
 });

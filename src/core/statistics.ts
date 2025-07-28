@@ -5,6 +5,7 @@
 
 import type { 
   NumericArray, 
+  NumericMatrix,
   StatisticalOptions,
   Axis 
 } from '../types/common.js';
@@ -15,6 +16,7 @@ import {
 } from '../types/errors.js';
 import { 
   validateNumericArray,
+  validateNumericMatrix,
   validateFiniteNumber,
   validateNonNegativeNumber,
   validateInteger 
@@ -624,6 +626,489 @@ export function summary(arr: NumericArray): {
   }
   
   return extendedResult;
+}
+
+// ============================================================================
+// Advanced Statistical Functions
+// ============================================================================
+
+/**
+ * Calculate multiple percentiles at once
+ * @param arr - Array of numbers
+ * @param percentiles - Array of percentiles to calculate (0-100)
+ * @returns Array of percentile values
+ * 
+ * @example
+ * percentiles([1, 2, 3, 4, 5], [25, 50, 75]) // [2, 3, 4]
+ */
+export function percentiles(arr: NumericArray, percentiles: NumericArray): NumericArray {
+  validateNumericArray(arr, 'arr');
+  validateNumericArray(percentiles, 'percentiles');
+  
+  for (let i = 0; i < percentiles.length; i++) {
+    const p = percentiles[i];
+    if (p === undefined) {
+      throw new InvalidParameterError(`percentiles[${i}]`, 'finite number', p);
+    }
+    if (p < 0 || p > 100) {
+      throw new InvalidParameterError(
+        `percentiles[${i}]`, 
+        'number between 0 and 100', 
+        p
+      );
+    }
+  }
+  
+  return percentiles.map(p => percentile(arr, p));
+}
+
+/**
+ * Calculate multiple quantiles at once
+ * @param arr - Array of numbers
+ * @param quantiles - Array of quantiles to calculate (0-1)
+ * @returns Array of quantile values
+ * 
+ * @example
+ * quantiles([1, 2, 3, 4, 5], [0.25, 0.5, 0.75]) // [2, 3, 4]
+ */
+export function quantiles(arr: NumericArray, quantiles: NumericArray): NumericArray {
+  validateNumericArray(arr, 'arr');
+  validateNumericArray(quantiles, 'quantiles');
+  
+  for (let i = 0; i < quantiles.length; i++) {
+    const q = quantiles[i];
+    if (q === undefined) {
+      throw new InvalidParameterError(`quantiles[${i}]`, 'finite number', q);
+    }
+    if (q < 0 || q > 1) {
+      throw new InvalidParameterError(
+        `quantiles[${i}]`, 
+        'number between 0 and 1', 
+        q
+      );
+    }
+  }
+  
+  return quantiles.map(q => quantile(arr, q));
+}
+
+/**
+ * Calculate the coefficient of variation (CV)
+ * @param arr - Array of numbers
+ * @param options - Statistical options
+ * @returns Coefficient of variation (std dev / mean)
+ * 
+ * @example
+ * coefficientOfVariation([1, 2, 3, 4, 5]) // ~0.527
+ */
+export function coefficientOfVariation(arr: NumericArray, options: StatisticalOptions = {}): number {
+  const arrayMean = mean(arr);
+  const arrayStd = standardDeviation(arr, options);
+  
+  if (arrayMean === 0) {
+    throw new MathematicalError('Cannot calculate coefficient of variation with zero mean', 'coefficientOfVariation');
+  }
+  
+  return arrayStd / Math.abs(arrayMean);
+}
+
+/**
+ * Calculate the geometric mean of an array
+ * @param arr - Array of positive numbers
+ * @returns Geometric mean
+ * 
+ * @example
+ * geometricMean([1, 2, 4, 8]) // 2.828 (4th root of 64)
+ */
+export function geometricMean(arr: NumericArray): number {
+  validateNumericArray(arr, 'arr');
+  
+  if (arr.length === 0) {
+    throw new EmptyArrayError('geometricMean');
+  }
+  
+  // Check for non-positive values
+  for (let i = 0; i < arr.length; i++) {
+    const value = arr[i];
+    if (value === undefined) {
+      throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+    }
+    if (value <= 0) {
+      throw new InvalidParameterError(
+        `arr[${i}]`, 
+        'positive number', 
+        value,
+        'Geometric mean requires all positive values'
+      );
+    }
+  }
+  
+  // Calculate using logarithms to avoid overflow
+  let logSum = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const value = arr[i];
+    if (value === undefined) {
+      throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+    }
+    logSum += Math.log(value);
+  }
+  
+  return Math.exp(logSum / arr.length);
+}
+
+/**
+ * Calculate the harmonic mean of an array
+ * @param arr - Array of positive numbers
+ * @returns Harmonic mean
+ * 
+ * @example
+ * harmonicMean([1, 2, 4]) // ~1.714 (3 / (1/1 + 1/2 + 1/4))
+ */
+export function harmonicMean(arr: NumericArray): number {
+  validateNumericArray(arr, 'arr');
+  
+  if (arr.length === 0) {
+    throw new EmptyArrayError('harmonicMean');
+  }
+  
+  let reciprocalSum = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const value = arr[i];
+    if (value === undefined) {
+      throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+    }
+    if (value === 0) {
+      throw new InvalidParameterError(
+        `arr[${i}]`, 
+        'non-zero number', 
+        value,
+        'Harmonic mean requires all non-zero values'
+      );
+    }
+    reciprocalSum += 1 / value;
+  }
+  
+  return arr.length / reciprocalSum;
+}
+
+/**
+ * Calculate the root mean square (RMS) of an array
+ * @param arr - Array of numbers
+ * @returns Root mean square
+ * 
+ * @example
+ * rootMeanSquare([1, 2, 3, 4, 5]) // ~3.317
+ */
+export function rootMeanSquare(arr: NumericArray): number {
+  validateNumericArray(arr, 'arr');
+  
+  if (arr.length === 0) {
+    throw new EmptyArrayError('rootMeanSquare');
+  }
+  
+  let sumSquares = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const value = arr[i];
+    if (value === undefined) {
+      throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+    }
+    sumSquares += value * value;
+  }
+  
+  return Math.sqrt(sumSquares / arr.length);
+}
+
+// ============================================================================
+// Matrix Statistical Functions
+// ============================================================================
+
+/**
+ * Calculate correlation matrix for multiple variables
+ * @param matrix - 2D array where each column is a variable
+ * @returns Correlation matrix
+ * 
+ * @example
+ * correlationMatrix([[1, 2], [2, 4], [3, 6]]) // [[1, 1], [1, 1]] (perfect correlation)
+ */
+export function correlationMatrix(matrix: NumericMatrix): NumericMatrix {
+  validateNumericMatrix(matrix, 'matrix');
+  
+  if (matrix.length === 0) {
+    throw new EmptyArrayError('correlationMatrix');
+  }
+  
+  const numVars = matrix[0]!.length;
+  const numObs = matrix.length;
+  
+  // Extract columns (variables)
+  const variables: NumericArray[] = [];
+  for (let j = 0; j < numVars; j++) {
+    const column: NumericArray = [];
+    for (let i = 0; i < numObs; i++) {
+      const row = matrix[i];
+      if (row === undefined) {
+        throw new InvalidParameterError(`matrix[${i}]`, 'valid row', row);
+      }
+      const value = row[j];
+      if (value === undefined) {
+        throw new InvalidParameterError(`matrix[${i}][${j}]`, 'finite number', value);
+      }
+      column.push(value);
+    }
+    variables.push(column);
+  }
+  
+  // Calculate correlation matrix
+  const corrMatrix: NumericMatrix = [];
+  for (let i = 0; i < numVars; i++) {
+    const row: NumericArray = [];
+    for (let j = 0; j < numVars; j++) {
+      if (i === j) {
+        row.push(1); // Perfect correlation with itself
+      } else {
+        const corr = correlation(variables[i]!, variables[j]!);
+        row.push(corr);
+      }
+    }
+    corrMatrix.push(row);
+  }
+  
+  return corrMatrix;
+}
+
+/**
+ * Calculate covariance matrix for multiple variables
+ * @param matrix - 2D array where each column is a variable
+ * @param options - Statistical options
+ * @returns Covariance matrix
+ * 
+ * @example
+ * covarianceMatrix([[1, 2], [2, 4], [3, 6]]) // Covariance matrix
+ */
+export function covarianceMatrix(matrix: NumericMatrix, options: StatisticalOptions = {}): NumericMatrix {
+  validateNumericMatrix(matrix, 'matrix');
+  
+  if (matrix.length === 0) {
+    throw new EmptyArrayError('covarianceMatrix');
+  }
+  
+  const numVars = matrix[0]!.length;
+  const numObs = matrix.length;
+  
+  // Extract columns (variables)
+  const variables: NumericArray[] = [];
+  for (let j = 0; j < numVars; j++) {
+    const column: NumericArray = [];
+    for (let i = 0; i < numObs; i++) {
+      const row = matrix[i];
+      if (row === undefined) {
+        throw new InvalidParameterError(`matrix[${i}]`, 'valid row', row);
+      }
+      const value = row[j];
+      if (value === undefined) {
+        throw new InvalidParameterError(`matrix[${i}][${j}]`, 'finite number', value);
+      }
+      column.push(value);
+    }
+    variables.push(column);
+  }
+  
+  // Calculate covariance matrix
+  const covMatrix: NumericMatrix = [];
+  for (let i = 0; i < numVars; i++) {
+    const row: NumericArray = [];
+    for (let j = 0; j < numVars; j++) {
+      if (i === j) {
+        const varValue = variance(variables[i]!, options);
+        row.push(varValue);
+      } else {
+        const cov = covariance(variables[i]!, variables[j]!, options);
+        row.push(cov);
+      }
+    }
+    covMatrix.push(row);
+  }
+  
+  return covMatrix;
+}
+
+// ============================================================================
+// Robust Statistics
+// ============================================================================
+
+/**
+ * Calculate the median absolute deviation (MAD)
+ * @param arr - Array of numbers
+ * @param constant - Scaling constant (default: 1.4826 for normal distribution)
+ * @returns Median absolute deviation
+ * 
+ * @example
+ * medianAbsoluteDeviation([1, 2, 3, 4, 5]) // Robust measure of spread
+ */
+export function medianAbsoluteDeviation(arr: NumericArray, constant: number = 1.4826): number {
+  validateNumericArray(arr, 'arr');
+  validateFiniteNumber(constant, 'constant');
+  
+  if (arr.length === 0) {
+    throw new EmptyArrayError('medianAbsoluteDeviation');
+  }
+  
+  const arrayMedian = median(arr);
+  const deviations: NumericArray = [];
+  
+  for (let i = 0; i < arr.length; i++) {
+    const value = arr[i];
+    if (value === undefined) {
+      throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+    }
+    deviations.push(Math.abs(value - arrayMedian));
+  }
+  
+  return constant * median(deviations);
+}
+
+/**
+ * Calculate trimmed mean (mean after removing outliers)
+ * @param arr - Array of numbers
+ * @param trimPercent - Percentage to trim from each end (0-50)
+ * @returns Trimmed mean
+ * 
+ * @example
+ * trimmedMean([1, 2, 3, 4, 100], 20) // Remove 20% from each end
+ */
+export function trimmedMean(arr: NumericArray, trimPercent: number): number {
+  validateNumericArray(arr, 'arr');
+  validateFiniteNumber(trimPercent, 'trimPercent');
+  
+  if (arr.length === 0) {
+    throw new EmptyArrayError('trimmedMean');
+  }
+  
+  if (trimPercent < 0 || trimPercent > 50) {
+    throw new InvalidParameterError(
+      'trimPercent', 
+      'number between 0 and 50', 
+      trimPercent
+    );
+  }
+  
+  const sorted = [...arr].sort((a, b) => a - b);
+  const trimCount = Math.floor((trimPercent / 100) * sorted.length);
+  
+  if (trimCount * 2 >= sorted.length) {
+    throw new InvalidParameterError(
+      'trimPercent', 
+      'value that leaves at least one element', 
+      trimPercent
+    );
+  }
+  
+  const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
+  return mean(trimmed);
+}
+
+// ============================================================================
+// Distribution Testing
+// ============================================================================
+
+/**
+ * Calculate the Jarque-Bera test statistic for normality
+ * @param arr - Array of numbers
+ * @returns Jarque-Bera test statistic
+ * 
+ * @example
+ * jarqueBeraTest([1, 2, 3, 4, 5]) // Test for normality
+ */
+export function jarqueBeraTest(arr: NumericArray): number {
+  validateNumericArray(arr, 'arr');
+  
+  if (arr.length < 4) {
+    throw new InvalidParameterError(
+      'arr', 
+      'array with at least 4 elements', 
+      arr,
+      'Jarque-Bera test requires at least 4 data points'
+    );
+  }
+  
+  const n = arr.length;
+  const s = skewness(arr);
+  const k = kurtosis(arr);
+  
+  // Jarque-Bera statistic: JB = (n/6) * (S² + (1/4) * K²)
+  return (n / 6) * (s * s + (k * k) / 4);
+}
+
+/**
+ * Calculate Anderson-Darling test statistic for normality
+ * @param arr - Array of numbers
+ * @returns Anderson-Darling test statistic
+ * 
+ * @example
+ * andersonDarlingTest([1, 2, 3, 4, 5]) // Test for normality
+ */
+export function andersonDarlingTest(arr: NumericArray): number {
+  validateNumericArray(arr, 'arr');
+  
+  if (arr.length < 3) {
+    throw new InvalidParameterError(
+      'arr', 
+      'array with at least 3 elements', 
+      arr,
+      'Anderson-Darling test requires at least 3 data points'
+    );
+  }
+  
+  const n = arr.length;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const arrayMean = mean(arr);
+  const arrayStd = standardDeviation(arr);
+  
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const value = sorted[i];
+    if (value === undefined) {
+      throw new InvalidParameterError(`sorted[${i}]`, 'finite number', value);
+    }
+    
+    // Standardize the value
+    const z = (value - arrayMean) / arrayStd;
+    
+    // Calculate cumulative distribution function for standard normal
+    const phi = 0.5 * (1 + erf(z / Math.sqrt(2)));
+    
+    // Avoid log(0) by using small epsilon
+    const epsilon = 1e-15;
+    const logPhi = Math.log(Math.max(phi, epsilon));
+    const log1MinusPhi = Math.log(Math.max(1 - phi, epsilon));
+    
+    sum += (2 * i + 1) * logPhi + (2 * (n - i) - 1) * log1MinusPhi;
+  }
+  
+  return -n - sum / n;
+}
+
+/**
+ * Error function approximation for Anderson-Darling test
+ * @param x - Input value
+ * @returns Error function value
+ */
+function erf(x: number): number {
+  // Abramowitz and Stegun approximation
+  const a1 =  0.254829592;
+  const a2 = -0.284496736;
+  const a3 =  1.421413741;
+  const a4 = -1.453152027;
+  const a5 =  1.061405429;
+  const p  =  0.3275911;
+  
+  const sign = x >= 0 ? 1 : -1;
+  x = Math.abs(x);
+  
+  const t = 1.0 / (1.0 + p * x);
+  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  
+  return sign * y;
 }
 
 // ============================================================================
