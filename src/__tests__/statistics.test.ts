@@ -642,8 +642,8 @@ describe("Robust Statistics", () => {
       
       const madNormal = medianAbsoluteDeviation(normalData);
       const madOutlier = medianAbsoluteDeviation(dataWithOutlier);
-      const stdNormal = standardDeviation(normalData);
-      const stdOutlier = standardDeviation(dataWithOutlier);
+      const stdNormal = standardDeviation(normalData) as number;
+      const stdOutlier = standardDeviation(dataWithOutlier) as number;
       
       // MAD should be less affected by outliers than standard deviation
       const madRatio = madOutlier / madNormal;
@@ -661,7 +661,7 @@ describe("Robust Statistics", () => {
     test("should calculate trimmed mean", () => {
       const data = [1, 2, 3, 4, 100]; // 100 is an outlier
       const trimmed = trimmedMean(data, 20); // Remove 20% from each end
-      const regular = mean(data);
+      const regular = mean(data) as number;
       
       expect(trimmed).toBeLessThan(regular); // Should be less affected by outlier
       expect(trimmed).toBeGreaterThan(2);
@@ -732,7 +732,7 @@ describe("Distribution Testing", () => {
 describe("Type Safety", () => {
   test("should work with TypeScript strict mode", () => {
     const data: number[] = [1, 2, 3, 4, 5];
-    const meanValue: number = mean(data);
+    const meanValue: number = mean(data) as number;
     const stats: ReturnType<typeof summary> = summary(data);
     
     expect(typeof meanValue).toBe('number');

@@ -12,7 +12,8 @@ import type {
 import { 
   InvalidParameterError, 
   EmptyArrayError,
-  MathematicalError 
+  MathematicalError,
+  DimensionError 
 } from '../types/errors.js';
 import { 
   validateNumericArray,
@@ -27,31 +28,186 @@ import {
 // ============================================================================
 
 /**
+ * Calculate the sum of array elements
+ * @param arr - Array of numbers or matrix
+ * @param options - Statistical options including axis parameter
+ * @returns The sum value or array of sums along specified axis
+ * 
+ * @example
+ * sum([1, 2, 3, 4, 5]) // 15
+ * sum([[1, 2], [3, 4]], { axis: 0 }) // [4, 6] (column sums)
+ * sum([[1, 2], [3, 4]], { axis: 1 }) // [3, 7] (row sums)
+ */
+export function sum(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
+  const { axis = null } = options;
+  
+  if (axis === null) {
+    // Sum all elements
+    if (Array.isArray(arr[0])) {
+      // Matrix case
+      const matrix = arr as NumericMatrix;
+      validateNumericMatrix(matrix, 'arr');
+      
+      if (matrix.length === 0) {
+        throw new EmptyArrayError('sum');
+      }
+      
+      let total = 0;
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        for (let j = 0; j < row.length; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          total += value;
+        }
+      }
+      return total;
+    } else {
+      // Array case
+      const array = arr as NumericArray;
+      validateNumericArray(array, 'arr');
+      
+      if (array.length === 0) {
+        throw new EmptyArrayError('sum');
+      }
+      
+      let total = 0;
+      for (let i = 0; i < array.length; i++) {
+        const value = array[i];
+        if (value === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+        }
+        total += value;
+      }
+      return total;
+    }
+  } else {
+    // Sum along specified axis
+    if (!Array.isArray(arr[0])) {
+      throw new InvalidParameterError('arr', 'matrix when axis is specified', 'array');
+    }
+    
+    const matrix = arr as NumericMatrix;
+    validateNumericMatrix(matrix, 'arr');
+    
+    if (matrix.length === 0) {
+      throw new EmptyArrayError('sum');
+    }
+    
+    if (axis === 0) {
+      // Sum along rows (column sums)
+      const numCols = matrix[0]!.length;
+      const result: NumericArray = new Array(numCols).fill(0);
+      
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        if (row.length !== numCols) {
+          throw new DimensionError('All rows must have the same length', [numCols], [row.length]);
+        }
+        for (let j = 0; j < numCols; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          result[j]! += value;
+        }
+      }
+      return result;
+    } else if (axis === 1) {
+      // Sum along columns (row sums)
+      const result: NumericArray = [];
+      
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        
+        let rowSum = 0;
+        for (let j = 0; j < row.length; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          rowSum += value;
+        }
+        result.push(rowSum);
+      }
+      return result;
+    } else {
+      throw new InvalidParameterError('axis', '0, 1, or null', axis);
+    }
+  }
+}
+
+/**
  * Calculate the arithmetic mean (average) of an array
- * @param arr - Array of numbers
- * @returns The mean value
+ * @param arr - Array of numbers or matrix
+ * @param options - Statistical options including axis parameter
+ * @returns The mean value or array of means along specified axis
  * 
  * @example
  * mean([1, 2, 3, 4, 5]) // 3
- * mean([10, 20, 30]) // 20
+ * mean([[1, 2], [3, 4]], { axis: 0 }) // [2, 3] (column means)
+ * mean([[1, 2], [3, 4]], { axis: 1 }) // [1.5, 3.5] (row means)
  */
-export function mean(arr: NumericArray): number {
-  validateNumericArray(arr, 'arr');
+export function mean(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
+  const { axis = null } = options;
   
-  if (arr.length === 0) {
-    throw new EmptyArrayError('mean');
-  }
-  
-  let sum = 0;
-  for (let i = 0; i < arr.length; i++) {
-    const value = arr[i];
-    if (value === undefined) {
-      throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+  if (axis === null) {
+    // Mean of all elements
+    if (Array.isArray(arr[0])) {
+      // Matrix case
+      const matrix = arr as NumericMatrix;
+      validateNumericMatrix(matrix, 'arr');
+      
+      if (matrix.length === 0) {
+        throw new EmptyArrayError('mean');
+      }
+      
+      const totalSum = sum(matrix) as number;
+      const totalElements = matrix.length * matrix[0]!.length;
+      return totalSum / totalElements;
+    } else {
+      // Array case
+      const array = arr as NumericArray;
+      validateNumericArray(array, 'arr');
+      
+      if (array.length === 0) {
+        throw new EmptyArrayError('mean');
+      }
+      
+      const totalSum = sum(array) as number;
+      return totalSum / array.length;
     }
-    sum += value;
+  } else {
+    // Mean along specified axis
+    if (!Array.isArray(arr[0])) {
+      throw new InvalidParameterError('arr', 'matrix when axis is specified', 'array');
+    }
+    
+    const matrix = arr as NumericMatrix;
+    const sums = sum(matrix, { axis }) as NumericArray;
+    
+    if (axis === 0) {
+      // Column means
+      const numRows = matrix.length;
+      return sums.map(s => s / numRows);
+    } else if (axis === 1) {
+      // Row means
+      return sums.map((s, i) => s / matrix[i]!.length);
+    } else {
+      throw new InvalidParameterError('axis', '0, 1, or null', axis);
+    }
   }
-  
-  return sum / arr.length;
 }
 
 /**
@@ -148,62 +304,191 @@ export function mode(arr: NumericArray): number | NumericArray {
 
 /**
  * Calculate the variance of an array
- * @param arr - Array of numbers
- * @param options - Statistical options (ddof for degrees of freedom)
- * @returns The variance
+ * @param arr - Array of numbers or matrix
+ * @param options - Statistical options (ddof for degrees of freedom, axis)
+ * @returns The variance or array of variances along specified axis
  * 
  * @example
  * variance([1, 2, 3, 4, 5]) // 2.5 (population variance)
  * variance([1, 2, 3, 4, 5], { ddof: 1 }) // 2.5 (sample variance)
+ * variance([[1, 2], [3, 4]], { axis: 0 }) // [1, 1] (column variances)
  */
-export function variance(arr: NumericArray, options: StatisticalOptions = {}): number {
-  validateNumericArray(arr, 'arr');
-  
-  const { ddof = 0 } = options;
+export function variance(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
+  const { ddof = 0, axis = null } = options;
   validateNonNegativeNumber(ddof, 'ddof');
   validateInteger(ddof, 'ddof');
   
-  if (arr.length === 0) {
-    throw new EmptyArrayError('variance');
-  }
-  
-  if (arr.length <= ddof) {
-    throw new InvalidParameterError(
-      'ddof', 
-      `less than array length (${arr.length})`, 
-      ddof,
-      'Degrees of freedom cannot be greater than or equal to array length'
-    );
-  }
-  
-  const arrayMean = mean(arr);
-  let sumSquaredDiffs = 0;
-  
-  for (let i = 0; i < arr.length; i++) {
-    const value = arr[i];
-    if (value === undefined) {
-      throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+  if (axis === null) {
+    // Variance of all elements
+    if (Array.isArray(arr[0])) {
+      // Matrix case - flatten and calculate variance
+      const matrix = arr as NumericMatrix;
+      validateNumericMatrix(matrix, 'arr');
+      
+      if (matrix.length === 0) {
+        throw new EmptyArrayError('variance');
+      }
+      
+      const flatArray: NumericArray = [];
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        for (let j = 0; j < row.length; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          flatArray.push(value);
+        }
+      }
+      
+      if (flatArray.length <= ddof) {
+        throw new InvalidParameterError(
+          'ddof', 
+          `less than total elements (${flatArray.length})`, 
+          ddof
+        );
+      }
+      
+      const arrayMean = mean(flatArray) as number;
+      let sumSquaredDiffs = 0;
+      
+      for (let i = 0; i < flatArray.length; i++) {
+        const diff = flatArray[i]! - arrayMean;
+        sumSquaredDiffs += diff * diff;
+      }
+      
+      return sumSquaredDiffs / (flatArray.length - ddof);
+    } else {
+      // Array case
+      const array = arr as NumericArray;
+      validateNumericArray(array, 'arr');
+      
+      if (array.length === 0) {
+        throw new EmptyArrayError('variance');
+      }
+      
+      if (array.length <= ddof) {
+        throw new InvalidParameterError(
+          'ddof', 
+          `less than array length (${array.length})`, 
+          ddof
+        );
+      }
+      
+      const arrayMean = mean(array) as number;
+      let sumSquaredDiffs = 0;
+      
+      for (let i = 0; i < array.length; i++) {
+        const value = array[i];
+        if (value === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'finite number', value);
+        }
+        const diff = value - arrayMean;
+        sumSquaredDiffs += diff * diff;
+      }
+      
+      return sumSquaredDiffs / (array.length - ddof);
     }
-    const diff = value - arrayMean;
-    sumSquaredDiffs += diff * diff;
+  } else {
+    // Variance along specified axis
+    if (!Array.isArray(arr[0])) {
+      throw new InvalidParameterError('arr', 'matrix when axis is specified', 'array');
+    }
+    
+    const matrix = arr as NumericMatrix;
+    validateNumericMatrix(matrix, 'arr');
+    
+    if (matrix.length === 0) {
+      throw new EmptyArrayError('variance');
+    }
+    
+    const means = mean(matrix, { axis }) as NumericArray;
+    
+    if (axis === 0) {
+      // Column variances
+      const numRows = matrix.length;
+      if (numRows <= ddof) {
+        throw new InvalidParameterError('ddof', `less than number of rows (${numRows})`, ddof);
+      }
+      
+      const numCols = matrix[0]!.length;
+      const result: NumericArray = new Array(numCols).fill(0);
+      
+      for (let j = 0; j < numCols; j++) {
+        let sumSquaredDiffs = 0;
+        const colMean = means[j]!;
+        
+        for (let i = 0; i < numRows; i++) {
+          const value = matrix[i]![j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          const diff = value - colMean;
+          sumSquaredDiffs += diff * diff;
+        }
+        
+        result[j] = sumSquaredDiffs / (numRows - ddof);
+      }
+      
+      return result;
+    } else if (axis === 1) {
+      // Row variances
+      const result: NumericArray = [];
+      
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        
+        if (row.length <= ddof) {
+          throw new InvalidParameterError('ddof', `less than row length (${row.length})`, ddof);
+        }
+        
+        const rowMean = means[i]!;
+        let sumSquaredDiffs = 0;
+        
+        for (let j = 0; j < row.length; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          const diff = value - rowMean;
+          sumSquaredDiffs += diff * diff;
+        }
+        
+        result.push(sumSquaredDiffs / (row.length - ddof));
+      }
+      
+      return result;
+    } else {
+      throw new InvalidParameterError('axis', '0, 1, or null', axis);
+    }
   }
-  
-  return sumSquaredDiffs / (arr.length - ddof);
 }
 
 /**
  * Calculate the standard deviation of an array
- * @param arr - Array of numbers
- * @param options - Statistical options (ddof for degrees of freedom)
- * @returns The standard deviation
+ * @param arr - Array of numbers or matrix
+ * @param options - Statistical options (ddof for degrees of freedom, axis)
+ * @returns The standard deviation or array of standard deviations along specified axis
  * 
  * @example
  * standardDeviation([1, 2, 3, 4, 5]) // ~1.58 (population std dev)
  * standardDeviation([1, 2, 3, 4, 5], { ddof: 1 }) // ~1.58 (sample std dev)
+ * standardDeviation([[1, 2], [3, 4]], { axis: 0 }) // [1, 1] (column std devs)
  */
-export function standardDeviation(arr: NumericArray, options: StatisticalOptions = {}): number {
+export function standardDeviation(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
   const varianceValue = variance(arr, options);
-  return Math.sqrt(varianceValue);
+  
+  if (typeof varianceValue === 'number') {
+    return Math.sqrt(varianceValue);
+  } else {
+    return varianceValue.map(v => Math.sqrt(v));
+  }
 }
 
 // ============================================================================
@@ -321,38 +606,228 @@ export function iqr(arr: NumericArray): number {
 
 /**
  * Find the minimum value in an array
- * @param arr - Array of numbers
- * @returns The minimum value
+ * @param arr - Array of numbers or matrix
+ * @param options - Statistical options including axis parameter
+ * @returns The minimum value or array of minimums along specified axis
  * 
  * @example
  * min([3, 1, 4, 1, 5]) // 1
+ * min([[1, 2], [3, 4]], { axis: 0 }) // [1, 2] (column mins)
+ * min([[1, 2], [3, 4]], { axis: 1 }) // [1, 3] (row mins)
  */
-export function min(arr: NumericArray): number {
-  validateNumericArray(arr, 'arr');
+export function min(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
+  const { axis = null } = options;
   
-  if (arr.length === 0) {
-    throw new EmptyArrayError('min');
+  if (axis === null) {
+    // Min of all elements
+    if (Array.isArray(arr[0])) {
+      // Matrix case
+      const matrix = arr as NumericMatrix;
+      validateNumericMatrix(matrix, 'arr');
+      
+      if (matrix.length === 0) {
+        throw new EmptyArrayError('min');
+      }
+      
+      let minValue = Infinity;
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        for (let j = 0; j < row.length; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          if (value < minValue) {
+            minValue = value;
+          }
+        }
+      }
+      return minValue;
+    } else {
+      // Array case
+      const array = arr as NumericArray;
+      validateNumericArray(array, 'arr');
+      
+      if (array.length === 0) {
+        throw new EmptyArrayError('min');
+      }
+      
+      return Math.min(...array);
+    }
+  } else {
+    // Min along specified axis
+    if (!Array.isArray(arr[0])) {
+      throw new InvalidParameterError('arr', 'matrix when axis is specified', 'array');
+    }
+    
+    const matrix = arr as NumericMatrix;
+    validateNumericMatrix(matrix, 'arr');
+    
+    if (matrix.length === 0) {
+      throw new EmptyArrayError('min');
+    }
+    
+    if (axis === 0) {
+      // Column mins
+      const numCols = matrix[0]!.length;
+      const result: NumericArray = new Array(numCols).fill(Infinity);
+      
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        if (row.length !== numCols) {
+          throw new DimensionError('All rows must have the same length', [numCols], [row.length]);
+        }
+        for (let j = 0; j < numCols; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          if (value < result[j]!) {
+            result[j] = value;
+          }
+        }
+      }
+      return result;
+    } else if (axis === 1) {
+      // Row mins
+      const result: NumericArray = [];
+      
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        
+        if (row.length === 0) {
+          throw new EmptyArrayError(`min (row ${i})`);
+        }
+        
+        result.push(Math.min(...row));
+      }
+      return result;
+    } else {
+      throw new InvalidParameterError('axis', '0, 1, or null', axis);
+    }
   }
-  
-  return Math.min(...arr);
 }
 
 /**
  * Find the maximum value in an array
- * @param arr - Array of numbers
- * @returns The maximum value
+ * @param arr - Array of numbers or matrix
+ * @param options - Statistical options including axis parameter
+ * @returns The maximum value or array of maximums along specified axis
  * 
  * @example
  * max([3, 1, 4, 1, 5]) // 5
+ * max([[1, 2], [3, 4]], { axis: 0 }) // [3, 4] (column maxs)
+ * max([[1, 2], [3, 4]], { axis: 1 }) // [2, 4] (row maxs)
  */
-export function max(arr: NumericArray): number {
-  validateNumericArray(arr, 'arr');
+export function max(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
+  const { axis = null } = options;
   
-  if (arr.length === 0) {
-    throw new EmptyArrayError('max');
+  if (axis === null) {
+    // Max of all elements
+    if (Array.isArray(arr[0])) {
+      // Matrix case
+      const matrix = arr as NumericMatrix;
+      validateNumericMatrix(matrix, 'arr');
+      
+      if (matrix.length === 0) {
+        throw new EmptyArrayError('max');
+      }
+      
+      let maxValue = -Infinity;
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        for (let j = 0; j < row.length; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          if (value > maxValue) {
+            maxValue = value;
+          }
+        }
+      }
+      return maxValue;
+    } else {
+      // Array case
+      const array = arr as NumericArray;
+      validateNumericArray(array, 'arr');
+      
+      if (array.length === 0) {
+        throw new EmptyArrayError('max');
+      }
+      
+      return Math.max(...array);
+    }
+  } else {
+    // Max along specified axis
+    if (!Array.isArray(arr[0])) {
+      throw new InvalidParameterError('arr', 'matrix when axis is specified', 'array');
+    }
+    
+    const matrix = arr as NumericMatrix;
+    validateNumericMatrix(matrix, 'arr');
+    
+    if (matrix.length === 0) {
+      throw new EmptyArrayError('max');
+    }
+    
+    if (axis === 0) {
+      // Column maxs
+      const numCols = matrix[0]!.length;
+      const result: NumericArray = new Array(numCols).fill(-Infinity);
+      
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        if (row.length !== numCols) {
+          throw new DimensionError('All rows must have the same length', [numCols], [row.length]);
+        }
+        for (let j = 0; j < numCols; j++) {
+          const value = row[j];
+          if (value === undefined) {
+            throw new InvalidParameterError(`arr[${i}][${j}]`, 'finite number', value);
+          }
+          if (value > result[j]!) {
+            result[j] = value;
+          }
+        }
+      }
+      return result;
+    } else if (axis === 1) {
+      // Row maxs
+      const result: NumericArray = [];
+      
+      for (let i = 0; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (row === undefined) {
+          throw new InvalidParameterError(`arr[${i}]`, 'valid row', row);
+        }
+        
+        if (row.length === 0) {
+          throw new EmptyArrayError(`max (row ${i})`);
+        }
+        
+        result.push(Math.max(...row));
+      }
+      return result;
+    } else {
+      throw new InvalidParameterError('axis', '0, 1, or null', axis);
+    }
   }
-  
-  return Math.max(...arr);
 }
 
 /**
@@ -364,7 +839,7 @@ export function max(arr: NumericArray): number {
  * range([1, 2, 3, 4, 5]) // 4
  */
 export function range(arr: NumericArray): number {
-  return max(arr) - min(arr);
+  return (max(arr) as number) - (min(arr) as number);
 }
 
 // ============================================================================
@@ -393,8 +868,8 @@ export function skewness(arr: NumericArray, options: StatisticalOptions = {}): n
     );
   }
   
-  const arrayMean = mean(arr);
-  const arrayStd = standardDeviation(arr, options);
+  const arrayMean = mean(arr) as number;
+  const arrayStd = standardDeviation(arr, options) as number;
   
   if (arrayStd === 0) {
     throw new MathematicalError('Cannot calculate skewness with zero standard deviation', 'skewness');
@@ -434,8 +909,8 @@ export function kurtosis(arr: NumericArray, options: StatisticalOptions = {}): n
     );
   }
   
-  const arrayMean = mean(arr);
-  const arrayStd = standardDeviation(arr, options);
+  const arrayMean = mean(arr) as number;
+  const arrayStd = standardDeviation(arr, options) as number;
   
   if (arrayStd === 0) {
     throw new MathematicalError('Cannot calculate kurtosis with zero standard deviation', 'kurtosis');
@@ -499,8 +974,8 @@ export function covariance(x: NumericArray, y: NumericArray, options: Statistica
     );
   }
   
-  const meanX = mean(x);
-  const meanY = mean(y);
+  const meanX = mean(x) as number;
+  const meanY = mean(y) as number;
   
   let sumProducts = 0;
   for (let i = 0; i < x.length; i++) {
@@ -528,8 +1003,8 @@ export function covariance(x: NumericArray, y: NumericArray, options: Statistica
  */
 export function correlation(x: NumericArray, y: NumericArray): number {
   const cov = covariance(x, y);
-  const stdX = standardDeviation(x);
-  const stdY = standardDeviation(y);
+  const stdX = standardDeviation(x) as number;
+  const stdY = standardDeviation(y) as number;
   
   if (stdX === 0 || stdY === 0) {
     throw new MathematicalError(
@@ -590,14 +1065,14 @@ export function summary(arr: NumericArray): {
   
   const result = {
     count: arr.length,
-    mean: mean(arr),
+    mean: mean(arr) as number,
     median: median(arr),
     mode: mode(arr),
-    min: min(arr),
-    max: max(arr),
+    min: min(arr) as number,
+    max: max(arr) as number,
     range: range(arr),
-    variance: variance(arr),
-    standardDeviation: standardDeviation(arr),
+    variance: variance(arr) as number,
+    standardDeviation: standardDeviation(arr) as number,
     q1: quantile(arr, 0.25),
     q3: quantile(arr, 0.75),
     iqr: iqr(arr),
@@ -702,8 +1177,8 @@ export function quantiles(arr: NumericArray, quantiles: NumericArray): NumericAr
  * coefficientOfVariation([1, 2, 3, 4, 5]) // ~0.527
  */
 export function coefficientOfVariation(arr: NumericArray, options: StatisticalOptions = {}): number {
-  const arrayMean = mean(arr);
-  const arrayStd = standardDeviation(arr, options);
+  const arrayMean = mean(arr) as number;
+  const arrayStd = standardDeviation(arr, options) as number;
   
   if (arrayMean === 0) {
     throw new MathematicalError('Cannot calculate coefficient of variation with zero mean', 'coefficientOfVariation');
@@ -919,7 +1394,7 @@ export function covarianceMatrix(matrix: NumericMatrix, options: StatisticalOpti
     const row: NumericArray = [];
     for (let j = 0; j < numVars; j++) {
       if (i === j) {
-        const varValue = variance(variables[i]!, options);
+        const varValue = variance(variables[i]!, options) as number;
         row.push(varValue);
       } else {
         const cov = covariance(variables[i]!, variables[j]!, options);
@@ -1004,7 +1479,7 @@ export function trimmedMean(arr: NumericArray, trimPercent: number): number {
   }
   
   const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
-  return mean(trimmed);
+  return mean(trimmed) as number;
 }
 
 // ============================================================================
@@ -1061,8 +1536,8 @@ export function andersonDarlingTest(arr: NumericArray): number {
   
   const n = arr.length;
   const sorted = [...arr].sort((a, b) => a - b);
-  const arrayMean = mean(arr);
-  const arrayStd = standardDeviation(arr);
+  const arrayMean = mean(arr) as number;
+  const arrayStd = standardDeviation(arr) as number;
   
   let sum = 0;
   for (let i = 0; i < n; i++) {
@@ -1143,8 +1618,8 @@ export function histogram(
       throw new InvalidParameterError('bins', 'positive integer', bins);
     }
     
-    const minVal = min(arr);
-    const maxVal = max(arr);
+    const minVal = min(arr) as number;
+    const maxVal = max(arr) as number;
     const binWidth = (maxVal - minVal) / bins;
     
     binEdges = [];

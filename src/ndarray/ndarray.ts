@@ -1089,15 +1089,25 @@ export class NDArray {
     /**
      * Convert flat index to multi-dimensional indices
      */
-    _flatIndexToIndices(flatIndex: number, shape: Shape, strides: number[]): number[] {
+    _flatIndexToIndices(flatIndex: number, shape: Shape, strides?: number[]): number[] {
         const indices: number[] = [];
         let remaining = flatIndex;
 
-        for (let i = 0; i < shape.length; i++) {
-            const stride = strides[i]!;
-            const index = Math.floor(remaining / stride);
-            indices.push(index);
-            remaining = remaining % stride;
+        if (strides) {
+            // Use strides for conversion
+            for (let i = 0; i < shape.length; i++) {
+                const stride = strides[i]!;
+                const index = Math.floor(remaining / stride);
+                indices.push(index);
+                remaining = remaining % stride;
+            }
+        } else {
+            // Use shape-based conversion (row-major order)
+            for (let i = shape.length - 1; i >= 0; i--) {
+                const dimSize = shape[i]!;
+                indices.unshift(remaining % dimSize);
+                remaining = Math.floor(remaining / dimSize);
+            }
         }
 
         return indices;
@@ -1218,6 +1228,267 @@ export class NDArray {
             return a % b;
         }, 'mod');
     }
+
+    // ============================================================================
+    // Axis-wise Operations
+    // ============================================================================
+
+    /**
+     * Sum of array elements along specified axis
+     * @param axis - Axis along which to sum (null for all elements)
+     * @returns Sum value or NDArray with sums along axis
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * a.sum() // 10 (sum of all elements)
+     * a.sum(0) // NDArray([4, 6]) (column sums)
+     * a.sum(1) // NDArray([3, 7]) (row sums)
+     */
+    sum(axis?: number | null): NDArray | number {
+        if (axis === undefined || axis === null) {
+            // Sum all elements
+            let total = 0;
+            for (let i = 0; i < this._data.length; i++) {
+                total += this._data[i + this._offset]!;
+            }
+            return total;
+        }
+
+        return this._reduceAlongAxis(axis, (acc, val) => acc + val, 0);
+    }
+
+    /**
+     * Mean of array elements along specified axis
+     * @param axis - Axis along which to calculate mean (null for all elements)
+     * @returns Mean value or NDArray with means along axis
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * a.mean() // 2.5 (mean of all elements)
+     * a.mean(0) // NDArray([2, 3]) (column means)
+     * a.mean(1) // NDArray([1.5, 3.5]) (row means)
+     */
+    mean(axis?: number | null): NDArray | number {
+        if (axis === undefined || axis === null) {
+            // Mean of all elements
+            const total = this.sum() as number;
+            return total / this.size;
+        }
+
+        const sums = this.sum(axis) as NDArray;
+        const counts = this._shape[axis]!;
+        
+        // Create result array with means
+        const resultData = new (this._data.constructor as any)(sums.size);
+        for (let i = 0; i < sums.size; i++) {
+            resultData[i] = sums._data[i + sums._offset]! / counts;
+        }
+
+        return new NDArray(resultData, sums.shape, { dtype: this._dtype });
+    }
+
+    /**
+     * Standard deviation of array elements along specified axis
+     * @param axis - Axis along which to calculate std (null for all elements)
+     * @param ddof - Delta degrees of freedom (default: 0)
+     * @returns Standard deviation value or NDArray with std along axis
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * a.std() // ~1.29 (std of all elements)
+     * a.std(0) // NDArray([1, 1]) (column stds)
+     * a.std(1) // NDArray([0.5, 0.5]) (row stds)
+     */
+    std(axis?: number | null, ddof: number = 0): NDArray | number {
+        const variance = this.var(axis, ddof);
+        
+        if (typeof variance === 'number') {
+            return Math.sqrt(variance);
+        } else {
+            const resultData = new (this._data.constructor as any)(variance.size);
+            for (let i = 0; i < variance.size; i++) {
+                resultData[i] = Math.sqrt(variance._data[i + variance._offset]!);
+            }
+            return new NDArray(resultData, variance.shape, { dtype: this._dtype });
+        }
+    }
+
+    /**
+     * Variance of array elements along specified axis
+     * @param axis - Axis along which to calculate variance (null for all elements)
+     * @param ddof - Delta degrees of freedom (default: 0)
+     * @returns Variance value or NDArray with variances along axis
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * a.var() // ~1.67 (variance of all elements)
+     * a.var(0) // NDArray([1, 1]) (column variances)
+     * a.var(1) // NDArray([0.25, 0.25]) (row variances)
+     */
+    var(axis?: number | null, ddof: number = 0): NDArray | number {
+        if (axis === undefined || axis === null) {
+            // Variance of all elements
+            const meanValue = this.mean() as number;
+            let sumSquaredDiffs = 0;
+            
+            for (let i = 0; i < this._data.length; i++) {
+                const diff = this._data[i + this._offset]! - meanValue;
+                sumSquaredDiffs += diff * diff;
+            }
+            
+            const n = this.size;
+            if (n <= ddof) {
+                throw new InvalidParameterError('ddof', `less than array size (${n})`, ddof);
+            }
+            
+            return sumSquaredDiffs / (n - ddof);
+        }
+
+        const means = this.mean(axis) as NDArray;
+        const n = this._shape[axis]!;
+        
+        if (n <= ddof) {
+            throw new InvalidParameterError('ddof', `less than axis size (${n})`, ddof);
+        }
+
+        // Calculate variance along axis
+        const resultShape = [...this._shape];
+        resultShape.splice(axis, 1);
+        
+        if (resultShape.length === 0) {
+            resultShape.push(1);
+        }
+        
+        const resultSize = resultShape.reduce((a, b) => a * b, 1);
+        const resultData = new (this._data.constructor as any)(resultSize);
+        
+        // Iterate through result positions
+        for (let resultIdx = 0; resultIdx < resultSize; resultIdx++) {
+            const resultIndices = this._flatIndexToIndices(resultIdx, resultShape);
+            const meanValue = means.get(...resultIndices);
+            
+            let sumSquaredDiffs = 0;
+            
+            // Sum squared differences along the specified axis
+            for (let axisIdx = 0; axisIdx < this._shape[axis]!; axisIdx++) {
+                const indices = [...resultIndices];
+                indices.splice(axis, 0, axisIdx);
+                
+                const value = this.get(...indices);
+                const diff = value - meanValue;
+                sumSquaredDiffs += diff * diff;
+            }
+            
+            resultData[resultIdx] = sumSquaredDiffs / (n - ddof);
+        }
+
+        return new NDArray(resultData, resultShape, { dtype: this._dtype });
+    }
+
+    /**
+     * Minimum value along specified axis
+     * @param axis - Axis along which to find minimum (null for all elements)
+     * @returns Minimum value or NDArray with minimums along axis
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * a.min() // 1 (min of all elements)
+     * a.min(0) // NDArray([1, 2]) (column mins)
+     * a.min(1) // NDArray([1, 3]) (row mins)
+     */
+    min(axis?: number | null): NDArray | number {
+        if (axis === undefined || axis === null) {
+            // Min of all elements
+            let minValue = Infinity;
+            for (let i = 0; i < this._data.length; i++) {
+                const value = this._data[i + this._offset]!;
+                if (value < minValue) {
+                    minValue = value;
+                }
+            }
+            return minValue;
+        }
+
+        return this._reduceAlongAxis(axis, (acc, val) => Math.min(acc, val), Infinity);
+    }
+
+    /**
+     * Maximum value along specified axis
+     * @param axis - Axis along which to find maximum (null for all elements)
+     * @returns Maximum value or NDArray with maximums along axis
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * a.max() // 4 (max of all elements)
+     * a.max(0) // NDArray([3, 4]) (column maxs)
+     * a.max(1) // NDArray([2, 4]) (row maxs)
+     */
+    max(axis?: number | null): NDArray | number {
+        if (axis === undefined || axis === null) {
+            // Max of all elements
+            let maxValue = -Infinity;
+            for (let i = 0; i < this._data.length; i++) {
+                const value = this._data[i + this._offset]!;
+                if (value > maxValue) {
+                    maxValue = value;
+                }
+            }
+            return maxValue;
+        }
+
+        return this._reduceAlongAxis(axis, (acc, val) => Math.max(acc, val), -Infinity);
+    }
+
+    // ============================================================================
+    // Private Helper Methods for Axis Operations
+    // ============================================================================
+
+    /**
+     * Reduce along a specified axis using a reduction function
+     * @param axis - Axis to reduce along
+     * @param reduceFn - Reduction function (accumulator, value) => newAccumulator
+     * @param initialValue - Initial value for the accumulator
+     * @returns NDArray with reduced values
+     */
+    private _reduceAlongAxis(axis: number, reduceFn: (acc: number, val: number) => number, initialValue: number): NDArray {
+        // Validate axis
+        if (!Number.isInteger(axis) || axis < 0 || axis >= this.ndim) {
+            throw new InvalidParameterError('axis', `integer between 0 and ${this.ndim - 1}`, axis);
+        }
+
+        // Calculate result shape (remove the reduced axis)
+        const resultShape = [...this._shape];
+        resultShape.splice(axis, 1);
+        
+        if (resultShape.length === 0) {
+            resultShape.push(1);
+        }
+        
+        const resultSize = resultShape.reduce((a, b) => a * b, 1);
+        const resultData = new (this._data.constructor as any)(resultSize);
+        
+        // Iterate through result positions
+        for (let resultIdx = 0; resultIdx < resultSize; resultIdx++) {
+            const resultIndices = this._flatIndexToIndices(resultIdx, resultShape);
+            
+            let accumulator = initialValue;
+            
+            // Reduce along the specified axis
+            for (let axisIdx = 0; axisIdx < this._shape[axis]!; axisIdx++) {
+                const indices = [...resultIndices];
+                indices.splice(axis, 0, axisIdx);
+                
+                const value = this.get(...indices);
+                accumulator = reduceFn(accumulator, value);
+            }
+            
+            resultData[resultIdx] = accumulator;
+        }
+
+        return new NDArray(resultData, resultShape, { dtype: this._dtype });
+    }
+
+
 
     // ============================================================================
     // String Representation
