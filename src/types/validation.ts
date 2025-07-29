@@ -104,6 +104,44 @@ export function validatePositiveInteger(
 }
 
 // ============================================================================
+// Shape Validation
+// ============================================================================
+
+/**
+ * Validate that a value is a valid shape array
+ */
+export function validateShape(
+  value: unknown, 
+  paramName: string = 'shape'
+): asserts value is Shape {
+  if (!Array.isArray(value)) {
+    throw new InvalidParameterError(paramName, 'array', value);
+  }
+  
+  if (value.length === 0) {
+    throw new InvalidParameterError(
+      paramName, 
+      'non-empty array', 
+      value,
+      'Shape must have at least one dimension'
+    );
+  }
+  
+  for (let i = 0; i < value.length; i++) {
+    const dim = value[i];
+    
+    if (!Number.isInteger(dim) || dim <= 0) {
+      throw new InvalidParameterError(
+        `${paramName}[${i}]`, 
+        'positive integer', 
+        dim,
+        'All shape dimensions must be positive integers'
+      );
+    }
+  }
+}
+
+// ============================================================================
 // Array Validation
 // ============================================================================
 

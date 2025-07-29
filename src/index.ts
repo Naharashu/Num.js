@@ -160,6 +160,13 @@ export { Matrix } from './matrix/Matrix.js';
 export { Array3d } from './matrix/Array3d.js';
 
 // ============================================================================
+// N-Dimensional Array (NumPy-like)
+// ============================================================================
+
+export { NDArray } from './ndarray/ndarray.js';
+export type { DType, NDArrayOptions } from './ndarray/ndarray.js';
+
+// ============================================================================
 // Specialized Data Types
 // ============================================================================
 
@@ -275,6 +282,7 @@ import * as utilities from './core/utilities.js';
 import * as statistics from './core/statistics.js';
 import { Matrix } from './matrix/Matrix.js';
 import { Array3d } from './matrix/Array3d.js';
+import { NDArray } from './ndarray/ndarray.js';
 import * as activations from './neural/activations.js';
 import * as losses from './neural/losses.js';
 import * as optimizers from './neural/optimizers.js';
@@ -307,6 +315,9 @@ const Num = {
   // Matrix classes
   Matrix,
   Array3d,
+  
+  // N-dimensional array
+  NDArray,
 
   // Neural network functions
   neural: {
