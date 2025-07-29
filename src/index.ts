@@ -62,8 +62,6 @@ export {
   factorize,
   reFactorial,
   logWithBase,
-  sinh,
-  cosh,
   cth,
   sech,
   csch,
@@ -96,6 +94,83 @@ export {
 export {
   MATH_CONSTANTS
 } from './core/constants.js';
+
+// Universal Functions (ufuncs)
+export {
+  // Mathematical ufuncs
+  abs,
+  sqrt,
+  cbrt,
+  exp,
+  exp2,
+  expm1,
+  log,
+  log2,
+  log10,
+  log1p,
+  sign,
+  ceil,
+  floor,
+  round,
+  trunc,
+  // Trigonometric ufuncs
+  sin,
+  cos,
+  tan,
+  asin,
+  acos,
+  atan,
+  atan2,
+  // Hyperbolic ufuncs
+  sinh,
+  cosh,
+  tanh,
+  asinh,
+  acosh,
+  atanh,
+  // Binary arithmetic ufuncs
+  add,
+  subtract,
+  multiply,
+  divide,
+  floorDivide,
+  mod,
+  power,
+  minimum,
+  maximum,
+  // Comparison ufuncs
+  equal,
+  notEqual,
+  less,
+  lessEqual,
+  greater,
+  greaterEqual,
+  // Logical ufuncs
+  logicalNot,
+  logicalAnd,
+  logicalOr,
+  logicalXor,
+  // Activation function ufuncs
+  sigmoid as ufuncSigmoid,
+  relu as ufuncRelu,
+  leakyRelu as ufuncLeakyRelu,
+  softplus as ufuncSoftplus,
+  softsign as ufuncSoftsign,
+  // Boolean reduction functions
+  any,
+  all,
+  // Utility functions
+  toBooleanArray,
+  countNonzero,
+  nonzero,
+  where,
+  // Ufunc creation utilities
+  createUnaryUfunc,
+  createBinaryUfunc,
+  applyUnary,
+  applyBinary,
+  isUfunc
+} from './core/ufuncs.js';
 
 export {
   getShape,
@@ -206,7 +281,6 @@ export {
   reluDerivative,
   sigmoid as neuralSigmoid,
   sigmoidDerivative,
-  tanh,
   tanhDerivative,
   leakyRelu,
   leakyReluDerivative,
@@ -291,6 +365,7 @@ import * as core from './core/basic-math.js';
 import * as constants from './core/constants.js';
 import * as utilities from './core/utilities.js';
 import * as statistics from './core/statistics.js';
+import * as ufuncs from './core/ufuncs.js';
 import { Matrix } from './matrix/Matrix.js';
 import { Array3d } from './matrix/Array3d.js';
 import { NDArray } from './ndarray/ndarray.js';
@@ -323,6 +398,9 @@ const Num = {
   ...constants,
   ...utilities,
   ...statistics,
+  
+  // Universal functions
+  ufuncs,
 
   // Matrix classes
   Matrix,

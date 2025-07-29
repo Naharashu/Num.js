@@ -952,6 +952,274 @@ export class NDArray {
     }
 
     // ============================================================================
+    // Broadcasting Utilities
+    // ============================================================================
+
+    /**
+     * Check if this array can be broadcast with another array
+     * @param other - Another NDArray or scalar
+     * @returns True if broadcasting is possible
+     */
+    private _canBroadcastWith(other: NDArray | number): boolean {
+        if (typeof other === 'number') {
+            return true; // Scalars can always be broadcast
+        }
+
+        const thisShape = this._shape;
+        const otherShape = other._shape;
+        const maxLen = Math.max(thisShape.length, otherShape.length);
+
+        // Pad shapes with 1s on the left to make them the same length
+        const paddedThis = [...Array(maxLen - thisShape.length).fill(1), ...thisShape];
+        const paddedOther = [...Array(maxLen - otherShape.length).fill(1), ...otherShape];
+
+        // Check if each dimension is compatible
+        for (let i = 0; i < maxLen; i++) {
+            const dimThis = paddedThis[i];
+            const dimOther = paddedOther[i];
+
+            // Dimensions are compatible if they're equal or one of them is 1
+            if (dimThis !== dimOther && dimThis !== 1 && dimOther !== 1) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Calculate the resulting shape after broadcasting with another array
+     * @param other - Another NDArray or scalar
+     * @returns Resulting broadcast shape
+     */
+    private _getBroadcastShape(other: NDArray | number): Shape {
+        if (typeof other === 'number') {
+            return [...this._shape]; // Scalar broadcasting preserves this shape
+        }
+
+        if (!this._canBroadcastWith(other)) {
+            throw new DimensionError(
+                'Arrays cannot be broadcast together',
+                this._shape,
+                other._shape,
+                'broadcasting'
+            );
+        }
+
+        const thisShape = this._shape;
+        const otherShape = other._shape;
+        const maxLen = Math.max(thisShape.length, otherShape.length);
+        const paddedThis = [...Array(maxLen - thisShape.length).fill(1), ...thisShape];
+        const paddedOther = [...Array(maxLen - otherShape.length).fill(1), ...otherShape];
+
+        const result: number[] = [];
+        for (let i = 0; i < maxLen; i++) {
+            result.push(Math.max(paddedThis[i], paddedOther[i]));
+        }
+
+        return result;
+    }
+
+    /**
+     * Perform element-wise binary operation with broadcasting
+     * @param other - Another NDArray or scalar
+     * @param operation - Binary operation function
+     * @param operationName - Name of the operation for error messages
+     * @returns New NDArray with the result
+     */
+    _broadcastBinaryOp(
+        other: NDArray | number,
+        operation: (a: number, b: number) => number,
+        operationName: string
+    ): NDArray {
+        const resultShape = this._getBroadcastShape(other);
+        const resultSize = calculateSize(resultShape);
+        const TypedArrayCtor = getTypedArrayConstructor(this._dtype);
+        const resultData = new TypedArrayCtor(resultSize);
+
+        if (typeof other === 'number') {
+            // Scalar broadcasting - simple case
+            for (let i = 0; i < this.size; i++) {
+                const thisValue = this._data[this._offset + i];
+                if (thisValue === undefined) {
+                    throw new MathematicalError(`Invalid data access at index ${i}`, operationName);
+                }
+                try {
+                    resultData[i] = operation(thisValue, other);
+                } catch (error) {
+                    throw new MathematicalError(`Operation failed: ${error}`, operationName);
+                }
+            }
+            return new NDArray(resultData, this._shape, { dtype: this._dtype });
+        }
+
+        // Array broadcasting - more complex case
+        const resultStrides = calculateStrides(resultShape);
+        
+        // Create iterators for both arrays
+        for (let i = 0; i < resultSize; i++) {
+            // Convert flat index to multi-dimensional indices
+            const resultIndices = this._flatIndexToIndices(i, resultShape, resultStrides);
+            
+            // Map result indices to source array indices
+            const thisIndices = this._mapBroadcastIndices(resultIndices, this._shape);
+            const otherIndices = this._mapBroadcastIndices(resultIndices, other._shape);
+            
+            // Get values from both arrays
+            const thisOffset = this._offset + indicesToOffset(thisIndices, this._strides);
+            const otherOffset = other._offset + indicesToOffset(otherIndices, other._strides);
+            
+            const thisValue = this._data[thisOffset];
+            const otherValue = other._data[otherOffset];
+            
+            if (thisValue === undefined || otherValue === undefined) {
+                throw new MathematicalError(`Invalid data access during broadcasting`, operationName);
+            }
+            
+            try {
+                resultData[i] = operation(thisValue, otherValue);
+            } catch (error) {
+                throw new MathematicalError(`Operation failed: ${error}`, operationName);
+            }
+        }
+
+        return new NDArray(resultData, resultShape, { dtype: this._dtype });
+    }
+
+    /**
+     * Convert flat index to multi-dimensional indices
+     */
+    _flatIndexToIndices(flatIndex: number, shape: Shape, strides: number[]): number[] {
+        const indices: number[] = [];
+        let remaining = flatIndex;
+
+        for (let i = 0; i < shape.length; i++) {
+            const stride = strides[i]!;
+            const index = Math.floor(remaining / stride);
+            indices.push(index);
+            remaining = remaining % stride;
+        }
+
+        return indices;
+    }
+
+    /**
+     * Map broadcast result indices to source array indices
+     */
+    private _mapBroadcastIndices(resultIndices: number[], sourceShape: Shape): number[] {
+        const sourceIndices: number[] = [];
+        const offset = resultIndices.length - sourceShape.length;
+
+        for (let i = 0; i < sourceShape.length; i++) {
+            const resultIndex = i + offset;
+            const sourceDim = sourceShape[i]!;
+            
+            if (sourceDim === 1) {
+                // Broadcast dimension - use index 0
+                sourceIndices.push(0);
+            } else {
+                // Normal dimension - use the result index
+                sourceIndices.push(resultIndices[resultIndex] || 0);
+            }
+        }
+
+        return sourceIndices;
+    }
+
+    // ============================================================================
+    // Arithmetic Operations with Broadcasting
+    // ============================================================================
+
+    /**
+     * Element-wise addition with broadcasting
+     * @param other - NDArray or scalar to add
+     * @returns New NDArray with the result
+     * 
+     * @example
+     * const a = new NDArray([1, 2, 3], [3]);
+     * const b = new NDArray([10], [1]);
+     * const result = a.add(b); // [11, 12, 13]
+     */
+    add(other: NDArray | number): NDArray {
+        return this._broadcastBinaryOp(other, (a, b) => a + b, 'add');
+    }
+
+    /**
+     * Element-wise subtraction with broadcasting
+     * @param other - NDArray or scalar to subtract
+     * @returns New NDArray with the result
+     * 
+     * @example
+     * const a = new NDArray([5, 6, 7], [3]);
+     * const result = a.subtract(2); // [3, 4, 5]
+     */
+    subtract(other: NDArray | number): NDArray {
+        return this._broadcastBinaryOp(other, (a, b) => a - b, 'subtract');
+    }
+
+    /**
+     * Element-wise multiplication with broadcasting
+     * @param other - NDArray or scalar to multiply
+     * @returns New NDArray with the result
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * const result = a.multiply(2); // [[2, 4], [6, 8]]
+     */
+    multiply(other: NDArray | number): NDArray {
+        return this._broadcastBinaryOp(other, (a, b) => a * b, 'multiply');
+    }
+
+    /**
+     * Element-wise division with broadcasting
+     * @param other - NDArray or scalar to divide by
+     * @returns New NDArray with the result
+     * 
+     * @example
+     * const a = new NDArray([10, 20, 30], [3]);
+     * const result = a.divide(5); // [2, 4, 6]
+     */
+    divide(other: NDArray | number): NDArray {
+        return this._broadcastBinaryOp(other, (a, b) => {
+            if (b === 0) {
+                throw new Error('Division by zero');
+            }
+            return a / b;
+        }, 'divide');
+    }
+
+    /**
+     * Element-wise power operation with broadcasting
+     * @param other - NDArray or scalar exponent
+     * @returns New NDArray with the result
+     * 
+     * @example
+     * const a = new NDArray([2, 3, 4], [3]);
+     * const result = a.power(2); // [4, 9, 16]
+     */
+    power(other: NDArray | number): NDArray {
+        return this._broadcastBinaryOp(other, (a, b) => Math.pow(a, b), 'power');
+    }
+
+    /**
+     * Element-wise modulo operation with broadcasting
+     * @param other - NDArray or scalar divisor
+     * @returns New NDArray with the result
+     * 
+     * @example
+     * const a = new NDArray([7, 8, 9], [3]);
+     * const result = a.mod(3); // [1, 2, 0]
+     */
+    mod(other: NDArray | number): NDArray {
+        return this._broadcastBinaryOp(other, (a, b) => {
+            if (b === 0) {
+                throw new Error('Modulo by zero');
+            }
+            return a % b;
+        }, 'mod');
+    }
+
+    // ============================================================================
     // String Representation
     // ============================================================================
 
