@@ -130,12 +130,12 @@ export function validateShape(
   for (let i = 0; i < value.length; i++) {
     const dim = value[i];
     
-    if (!Number.isInteger(dim) || dim <= 0) {
+    if (!Number.isInteger(dim) || dim < 0) {
       throw new InvalidParameterError(
         `${paramName}[${i}]`, 
-        'positive integer', 
+        'non-negative integer', 
         dim,
-        'All shape dimensions must be positive integers'
+        'All shape dimensions must be non-negative integers'
       );
     }
   }

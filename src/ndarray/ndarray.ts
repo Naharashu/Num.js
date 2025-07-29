@@ -261,6 +261,185 @@ export class NDArray {
     }
 
     /**
+     * Enhanced get method that supports string-based slicing
+     * @param indices - Mix of numbers and strings for indexing
+     * @returns Single element (number) or NDArray slice
+     */
+    getAdvanced(...indices: (number | string)[]): NDArray | number {
+        // If all indices are numbers, use the basic get method
+        if (indices.every(idx => typeof idx === 'number')) {
+            return this.get(...(indices as number[]));
+        }
+
+        // Use enhanced slicing for mixed or string-based indices
+        return this.sliceAdvanced(...indices);
+    }
+
+    /**
+     * Advanced slicing method that supports string-based syntax
+     * @param slices - Array of slice specifications (mix of numbers, strings, and arrays)
+     * @returns A new NDArray view of the sliced data
+     */
+    sliceAdvanced(...slices: Array<number | string | [number, number] | [number, number, number]>): NDArray {
+        if (slices.length > this.ndim) {
+            throw new DimensionError(
+                `Too many slice dimensions (${slices.length}) for array with ${this.ndim} dimensions`,
+                [this.ndim],
+                [slices.length]
+            );
+        }
+
+        const newShape: number[] = [];
+        const newStrides: number[] = [];
+        let newOffset = this._offset;
+
+        // Process each dimension
+        for (let i = 0; i < this.ndim; i++) {
+            if (i < slices.length) {
+                const slice = slices[i]!;
+                const sliceResult = this._applySliceToDimension(i, slice);
+
+                if (sliceResult.size >= 0) {
+                    // Dimension is preserved (including empty slices with size 0)
+                    newShape.push(sliceResult.size);
+                    newStrides.push(sliceResult.stride);
+                }
+                // If size is -1, dimension is eliminated (single index access)
+
+                newOffset += sliceResult.offset;
+            } else {
+                // No slice specified for this dimension - include entire dimension
+                newShape.push(this._shape[i]!);
+                newStrides.push(this._strides[i]!);
+            }
+        }
+
+        // Create a new NDArray that shares the same data buffer
+        const sliced = Object.create(NDArray.prototype) as NDArray;
+
+        // Share the same data buffer with new offset
+        (sliced as any)._data = this._data;
+        (sliced as any)._offset = newOffset;
+        (sliced as any)._dtype = this._dtype;
+        (sliced as any)._readonly = this._readonly;
+
+        // Set new shape and strides
+        (sliced as any)._shape = newShape;
+        (sliced as any)._strides = newStrides;
+
+        return sliced;
+    }
+
+    /**
+     * Fancy indexing - select elements using arrays of indices
+     * @param indices - Arrays of indices for each dimension
+     * @returns NDArray with selected elements
+     */
+    fancyIndex(...indices: number[][]): NDArray {
+        if (indices.length === 0) {
+            throw new InvalidParameterError('indices', 'at least one index array', 'empty');
+        }
+
+        if (indices.length > this.ndim) {
+            throw new DimensionError(
+                `Too many index arrays (${indices.length}) for array with ${this.ndim} dimensions`,
+                [this.ndim],
+                [indices.length]
+            );
+        }
+
+        // Validate all index arrays have the same length
+        const resultLength = indices[0]!.length;
+        for (let i = 1; i < indices.length; i++) {
+            if (indices[i]!.length !== resultLength) {
+                throw new DimensionError(
+                    'All index arrays must have the same length',
+                    [resultLength],
+                    [indices[i]!.length]
+                );
+            }
+        }
+
+        // Validate and normalize all indices
+        const normalizedIndices = indices.map((indexArray, dim) => {
+            return indexArray.map(idx => {
+                if (!Number.isInteger(idx)) {
+                    throw new InvalidParameterError(`indices[${dim}]`, 'array of integers', typeof idx);
+                }
+                return this._normalizeIndex(idx, this._shape[dim]!, dim);
+            });
+        });
+
+        // Create result array
+        const resultShape: Shape = [resultLength];
+        const resultData = new (this._data.constructor as any)(resultLength);
+
+        // Extract elements
+        for (let i = 0; i < resultLength; i++) {
+            const elementIndices = normalizedIndices.map(indexArray => indexArray[i]!);
+            
+            // Pad with zeros for missing dimensions
+            while (elementIndices.length < this.ndim) {
+                elementIndices.push(0);
+            }
+
+            const offset = this._offset + indicesToOffset(elementIndices, this._strides);
+            resultData[i] = this._data[offset];
+        }
+
+        return new NDArray(resultData, resultShape, { dtype: this._dtype, readonly: this._readonly });
+    }
+
+    /**
+     * Boolean indexing - select elements where boolean array is true
+     * @param boolArray - Boolean array for indexing (must match array size)
+     * @returns NDArray with selected elements
+     */
+    booleanIndex(boolArray: boolean[]): NDArray {
+        if (!Array.isArray(boolArray)) {
+            throw new InvalidParameterError('boolArray', 'array of booleans', typeof boolArray);
+        }
+
+        if (boolArray.length !== this.size) {
+            throw new DimensionError(
+                'Boolean array length must match array size',
+                [this.size],
+                [boolArray.length]
+            );
+        }
+
+        // Validate boolean array
+        for (let i = 0; i < boolArray.length; i++) {
+            if (typeof boolArray[i] !== 'boolean') {
+                throw new InvalidParameterError(`boolArray[${i}]`, 'boolean', typeof boolArray[i]);
+            }
+        }
+
+        // Count true values to determine result size
+        const trueCount = boolArray.filter(b => b).length;
+        
+        if (trueCount === 0) {
+            // Return empty array
+            const resultData = new (this._data.constructor as any)(0);
+            return new NDArray(resultData, [0], { dtype: this._dtype, readonly: this._readonly });
+        }
+
+        // Create result array
+        const resultData = new (this._data.constructor as any)(trueCount);
+        let resultIndex = 0;
+
+        // Extract elements where boolean is true
+        for (let i = 0; i < boolArray.length; i++) {
+            if (boolArray[i]) {
+                const offset = this._offset + i;
+                resultData[resultIndex++] = this._data[offset];
+            }
+        }
+
+        return new NDArray(resultData, [trueCount], { dtype: this._dtype, readonly: this._readonly });
+    }
+
+    /**
      * Set an element at the specified indices
      * @param indices - Multi-dimensional indices followed by the value
      */
@@ -339,6 +518,232 @@ export class NDArray {
             // Update the index in place for further processing
             indices[i] = normalizedIndex;
         }
+    }
+
+    /**
+     * Parse a string slice specification into a range slice
+     * Supports formats like "1:5", ":-1", "::2", "1:5:2", etc.
+     */
+    private _parseStringSlice(sliceStr: string): [number, number] | [number, number, number] {
+        if (typeof sliceStr !== 'string') {
+            throw new InvalidParameterError('sliceStr', 'string', sliceStr);
+        }
+
+        // Handle empty string
+        if (sliceStr.trim() === '') {
+            throw new InvalidParameterError('sliceStr', 'non-empty string', sliceStr);
+        }
+
+        // Split by colons
+        const parts = sliceStr.split(':');
+
+        if (parts.length === 1) {
+            // Single number - this should be handled as a single index, not a slice
+            const index = this._parseSliceNumber(parts[0]!, 0);
+            throw new InvalidParameterError('sliceStr', 'slice notation (e.g., "1:5")', `single index: ${index}`);
+        }
+
+        if (parts.length === 2) {
+            // Format: "start:end"
+            const start = this._parseSliceNumber(parts[0]!, 0);
+            const end = this._parseSliceNumber(parts[1]!, Infinity);
+            return [start, end];
+        }
+
+        if (parts.length === 3) {
+            // Format: "start:end:step"
+            const step = this._parseSliceNumber(parts[2]!, 1);
+
+            if (step === 0) {
+                throw new InvalidParameterError('step', 'non-zero integer', step);
+            }
+
+            // Default values depend on step direction
+            const defaultStart = step > 0 ? 0 : Infinity;
+            const defaultEnd = step > 0 ? Infinity : -Infinity;
+
+            const start = this._parseSliceNumber(parts[0]!, defaultStart);
+            const end = this._parseSliceNumber(parts[1]!, defaultEnd);
+
+            return [start, end, step];
+        }
+
+        throw new InvalidParameterError('sliceStr', 'valid slice format (start:end or start:end:step)', sliceStr);
+    }
+
+    /**
+     * Parse a single number from a slice string part
+     * Handles empty strings with default values
+     */
+    private _parseSliceNumber(str: string, defaultValue: number): number {
+        const trimmed = str.trim();
+        
+        if (trimmed === '') {
+            return defaultValue;
+        }
+
+        const num = parseInt(trimmed, 10);
+        
+        if (isNaN(num)) {
+            throw new InvalidParameterError('slice component', 'integer or empty', str);
+        }
+
+        return num;
+    }
+
+    /**
+     * Apply a slice specification to a specific dimension
+     * @param dimIndex - Which dimension to slice
+     * @param sliceSpec - The slice specification
+     * @returns Information about the slice (new size, offset, stride)
+     */
+    private _applySliceToDimension(
+        dimIndex: number,
+        sliceSpec: number | string | [number, number] | [number, number, number]
+    ): { size: number; offset: number; stride: number } {
+        const dimSize = this._shape[dimIndex]!;
+        const originalStride = this._strides[dimIndex]!;
+
+        if (typeof sliceSpec === 'number') {
+            // Single index - dimension is eliminated
+            const normalizedIndex = this._normalizeIndex(sliceSpec, dimSize, dimIndex);
+            return {
+                size: -1, // Special marker for dimension elimination
+                offset: normalizedIndex * originalStride,
+                stride: originalStride
+            };
+        }
+
+        if (typeof sliceSpec === 'string') {
+            // Parse string slice
+            const rangeSlice = this._parseStringSlice(sliceSpec);
+            return this._applyRangeSlice(rangeSlice, dimSize, originalStride, dimIndex);
+        }
+
+        if (Array.isArray(sliceSpec)) {
+            // Range slice
+            return this._applyRangeSlice(sliceSpec, dimSize, originalStride, dimIndex);
+        }
+
+        throw new InvalidParameterError('sliceSpec', 'number, string, or array', typeof sliceSpec);
+    }
+
+    /**
+     * Apply a range slice to a dimension
+     */
+    private _applyRangeSlice(
+        rangeSlice: [number, number] | [number, number, number],
+        dimSize: number,
+        originalStride: number,
+        dimIndex?: number
+    ): { size: number; offset: number; stride: number } {
+        const [start, end, step] = this._normalizeRangeSlice(rangeSlice, dimSize, dimIndex);
+
+        let sliceSize: number;
+        let offset: number;
+
+        if (step > 0) {
+            // Forward iteration
+            sliceSize = Math.max(0, Math.ceil((end - start) / step));
+            offset = start * originalStride;
+        } else {
+            // Backward iteration
+            sliceSize = Math.max(0, Math.ceil((start - end) / Math.abs(step)));
+            offset = start * originalStride;
+        }
+
+        return {
+            size: sliceSize,
+            offset,
+            stride: originalStride * step
+        };
+    }
+
+    /**
+     * Normalize a single index for a given dimension size
+     * Handles negative indexing (e.g., -1 for last element)
+     */
+    private _normalizeIndex(index: number, dimSize: number, dimIndex?: number): number {
+        if (!Number.isInteger(index)) {
+            throw new InvalidParameterError(`index${dimIndex !== undefined ? `[${dimIndex}]` : ''}`, 'integer', index);
+        }
+
+        // Handle negative indexing
+        const normalizedIndex = index < 0 ? dimSize + index : index;
+
+        // Check bounds
+        if (normalizedIndex < 0 || normalizedIndex >= dimSize) {
+            throw new IndexOutOfBoundsError(index, dimSize, dimIndex);
+        }
+
+        return normalizedIndex;
+    }
+
+    /**
+     * Normalize a range slice for a given dimension size
+     * Handles negative indices and default values
+     */
+    private _normalizeRangeSlice(
+        slice: [number, number] | [number, number, number],
+        dimSize: number,
+        dimIndex?: number
+    ): [number, number, number] {
+        let [start, end, step = 1] = slice;
+
+        if (step === 0) {
+            throw new InvalidParameterError('step', 'non-zero integer', step);
+        }
+
+        // Handle default values for start and end based on step direction
+        if (step > 0) {
+            // Forward iteration
+            if (start === -Infinity || (start < 0 && Math.abs(start) > dimSize)) {
+                start = 0;
+            } else if (start < 0) {
+                start = dimSize + start;
+            } else if (start > dimSize) {
+                start = dimSize;
+            }
+
+            if (end === Infinity || end > dimSize) {
+                end = dimSize;
+            } else if (end < 0) {
+                end = Math.max(0, dimSize + end);
+            }
+        } else {
+            // Backward iteration (negative step)
+            if (start === Infinity || start >= dimSize) {
+                start = dimSize - 1;
+            } else if (start < 0) {
+                start = dimSize + start;
+            }
+
+            if (end === -Infinity || (end < 0 && Math.abs(end) > dimSize)) {
+                end = -1; // One before the first element
+            } else if (end < 0) {
+                end = dimSize + end;
+            } else if (end >= dimSize) {
+                end = dimSize - 1;
+            }
+        }
+
+        // Ensure start and end are within valid bounds based on step direction
+        if (step > 0) {
+            // Forward iteration: start >= 0, end <= dimSize
+            // Don't clamp start if it would create an invalid range
+            if (start < 0) start = 0;
+            if (start > dimSize) start = dimSize;
+            if (end < 0) end = 0;
+            if (end > dimSize) end = dimSize;
+        } else {
+            // Backward iteration: start <= dimSize-1, end >= -1
+            if (start < 0) start = 0;
+            if (start >= dimSize) start = dimSize - 1;
+            if (end < -1) end = -1;
+            if (end >= dimSize) end = dimSize - 1;
+        }
+
+        return [start, end, step];
     }
 
     // ============================================================================
