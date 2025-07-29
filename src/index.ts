@@ -166,13 +166,24 @@ export { Array3d } from './matrix/Array3d.js';
 export { NDArray } from './ndarray/ndarray.js';
 export type { DType, NDArrayOptions } from './ndarray/ndarray.js';
 
+// NDArray factory functions
+export {
+  zeros as ndarrayZeros,
+  ones as ndarrayOnes,
+  full as ndarrayFull,
+  eye as ndarrayEye,
+  arange,
+  linspace,
+  fromArray
+} from './ndarray/factory.js';
+
 // ============================================================================
 // Specialized Data Types
 // ============================================================================
 
-export { 
-  Int128, 
-  fromNumber as int128FromNumber, 
+export {
+  Int128,
+  fromNumber as int128FromNumber,
   fromString as int128FromString,
   INT128_ZERO,
   INT128_ONE,
@@ -283,6 +294,7 @@ import * as statistics from './core/statistics.js';
 import { Matrix } from './matrix/Matrix.js';
 import { Array3d } from './matrix/Array3d.js';
 import { NDArray } from './ndarray/ndarray.js';
+import * as factory from './ndarray/factory.js';
 import * as activations from './neural/activations.js';
 import * as losses from './neural/losses.js';
 import * as optimizers from './neural/optimizers.js';
@@ -315,9 +327,15 @@ const Num = {
   // Matrix classes
   Matrix,
   Array3d,
-  
+
   // N-dimensional array
   NDArray,
+
+  // NDArray factory functions
+  ndarray: {
+    ...factory,
+    NDArray
+  },
 
   // Neural network functions
   neural: {
