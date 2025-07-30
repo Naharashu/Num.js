@@ -45,9 +45,6 @@ export {
 
 export {
   range,
-  randin,
-  randint,
-  random,
   root,
   factorial,
   fibonacci,
@@ -253,6 +250,47 @@ export {
 } from './ndarray/factory.js';
 
 // ============================================================================
+// Linear Algebra Functions
+// ============================================================================
+
+export {
+  det,
+  inv,
+  inverse,
+  rank,
+  trace,
+  norm,
+  solve,
+  isPositiveDefinite,
+  isSymmetric
+} from './linalg/linalg.js';
+
+// ============================================================================
+// Random Number Generation
+// ============================================================================
+
+export {
+  randin,
+  random,
+  randint,
+  randomArray,
+  uniform,
+  randintArray,
+  normal,
+  exponential,
+  gamma as randomGamma,
+  beta as randomBeta,
+  binomial,
+  poisson,
+  choice,
+  shuffle,
+  permutation,
+  seed,
+  getState,
+  randomBytes
+} from './random/random.js';
+
+// ============================================================================
 // Specialized Data Types
 // ============================================================================
 
@@ -370,6 +408,8 @@ import { Matrix } from './matrix/Matrix.js';
 import { Array3d } from './matrix/Array3d.js';
 import { NDArray } from './ndarray/ndarray.js';
 import * as factory from './ndarray/factory.js';
+import * as linalg from './linalg/linalg.js';
+import * as random from './random/random.js';
 import * as activations from './neural/activations.js';
 import * as losses from './neural/losses.js';
 import * as optimizers from './neural/optimizers.js';
@@ -387,6 +427,8 @@ import * as errors from './types/errors.js';
  * const data = [1, 2, 3, 4, 5];
  * const avg = Num.mean(data);
  * const matrix = new Num.Matrix([[1, 2], [3, 4]]);
+ * const det = Num.linalg.det(matrix);
+ * const randomData = Num.random.normal([10], 0, 1);
  * ```
  */
 const Num = {
@@ -414,6 +456,12 @@ const Num = {
     ...factory,
     NDArray
   },
+
+  // Linear algebra functions
+  linalg,
+
+  // Random number generation
+  random,
 
   // Neural network functions
   neural: {
