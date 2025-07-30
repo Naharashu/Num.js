@@ -192,6 +192,29 @@ export {
   isArray3dLike
 } from './core/utilities.js';
 
+// ============================================================================
+// Performance and Optimization
+// ============================================================================
+
+export {
+  benchmark,
+  compareBenchmarks,
+  benchmarkArithmetic,
+  benchmarkMemoryAllocation,
+  printBenchmarkResults
+} from './core/performance.js';
+
+export type { BenchmarkResult } from './core/performance.js';
+
+export {
+  lazy,
+  LazyNDArray
+} from './core/lazy.js';
+
+export type { LazyOperation } from './core/lazy.js';
+
+
+
 export {
   mean,
   median,
@@ -246,7 +269,8 @@ export {
   eye as ndarrayEye,
   arange,
   linspace,
-  fromArray
+  fromArray,
+  random as ndarrayRandom
 } from './ndarray/factory.js';
 
 // ============================================================================
@@ -415,6 +439,8 @@ import * as losses from './neural/losses.js';
 import * as optimizers from './neural/optimizers.js';
 import * as regularization from './neural/regularization.js';
 import * as errors from './types/errors.js';
+import * as performance from './core/performance.js';
+import * as lazy from './core/lazy.js';
 
 /**
  * Default namespace export containing all library functionality
@@ -469,7 +495,11 @@ const Num = {
     losses,
     optimizers,
     regularization
-  }
+  },
+
+  // Performance utilities
+  performance,
+  lazy
 };
 
 export default Num;

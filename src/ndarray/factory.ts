@@ -353,3 +353,30 @@ function createScalarNDArray(value: number, options: NDArrayOptions = {}): NDArr
     
     return scalar;
 }
+/**
+
+ * Create an array filled with random values between 0 and 1
+ * @param shape - Shape of the array
+ * @param options - Array creation options
+ * @returns NDArray filled with random values
+ * 
+ * @example
+ * ```typescript
+ * const arr = random([2, 3]); // 2x3 array of random values
+ * const arr2 = random([5], { dtype: 'float32' }); // 1D array of 5 random values as float32
+ * ```
+ */
+export function random(shape: Shape, options: NDArrayOptions = {}): NDArray {
+    validateShape(shape);
+    
+    const { dtype = 'float64' } = options;
+    const size = shape.reduce((acc, dim) => acc * dim, 1);
+    
+    // Create a typed array filled with random values
+    const data = createTypedArray(dtype, size);
+    for (let i = 0; i < size; i++) {
+        data[i] = Math.random();
+    }
+    
+    return new NDArray(data, shape, options);
+}

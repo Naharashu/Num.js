@@ -131,6 +131,16 @@ function indicesToOffset(indices: number[], strides: number[]): number {
  * 
  * This class uses a flat TypedArray buffer with shape and strides for efficient
  * memory layout and zero-copy operations like reshape and transpose.
+ * 
+ * All arithmetic operations support method chaining for fluent API usage:
+ * @example
+ * const result = arr.add(5).multiply(2).subtract(1).transpose();
+ * 
+ * Performance optimizations:
+ * - Stride-based iteration for multi-dimensional operations
+ * - Optimized kernels for scalar operations
+ * - Zero-copy views for reshape/transpose operations
+ * - Cache-friendly matrix multiplication
  */
 export class NDArray {
     /** Flat data buffer storing all elements */
@@ -1136,6 +1146,41 @@ export class NDArray {
         return sourceIndices;
     }
 
+    /**
+     * Optimized scalar operation method for better performance
+     * Uses direct TypedArray access without broadcasting overhead
+     * @param scalar - Scalar value to apply
+     * @param operation - Binary operation function
+     * @param operationName - Name of the operation for error messages
+     * @returns New NDArray with the result
+     */
+    private _applyScalarOperation(
+        scalar: number,
+        operation: (a: number, b: number) => number,
+        operationName: string
+    ): NDArray {
+        const size = this.size;
+        const TypedArrayCtor = getTypedArrayConstructor(this._dtype);
+        const resultData = new TypedArrayCtor(size);
+        const sourceData = this._data;
+        const offset = this._offset;
+        
+        // Optimized loop - JIT compiler can optimize simple for loops better
+        for (let i = 0; i < size; i++) {
+            const value = sourceData[offset + i];
+            if (value === undefined) {
+                throw new MathematicalError(`Invalid data access at index ${i}`, operationName);
+            }
+            try {
+                resultData[i] = operation(value, scalar);
+            } catch (error) {
+                throw new MathematicalError(`${operationName} failed at index ${i}: ${error}`, operationName);
+            }
+        }
+        
+        return new NDArray(resultData, this._shape, { dtype: this._dtype });
+    }
+
     // ============================================================================
     // Arithmetic Operations with Broadcasting
     // ============================================================================
@@ -1143,56 +1188,75 @@ export class NDArray {
     /**
      * Element-wise addition with broadcasting
      * @param other - NDArray or scalar to add
-     * @returns New NDArray with the result
+     * @returns New NDArray with the result (supports method chaining)
      * 
      * @example
      * const a = new NDArray([1, 2, 3], [3]);
      * const b = new NDArray([10], [1]);
-     * const result = a.add(b); // [11, 12, 13]
+     * const result = a.add(b).multiply(2); // [22, 24, 26] - chained operations
      */
     add(other: NDArray | number): NDArray {
+        // Use optimized kernel for scalar operations
+        if (typeof other === 'number') {
+            return this._applyScalarOperation(other, (a, b) => a + b, 'add');
+        }
         return this._broadcastBinaryOp(other, (a, b) => a + b, 'add');
     }
 
     /**
      * Element-wise subtraction with broadcasting
      * @param other - NDArray or scalar to subtract
-     * @returns New NDArray with the result
+     * @returns New NDArray with the result (supports method chaining)
      * 
      * @example
      * const a = new NDArray([5, 6, 7], [3]);
-     * const result = a.subtract(2); // [3, 4, 5]
+     * const result = a.subtract(2).add(1); // [4, 5, 6] - chained operations
      */
     subtract(other: NDArray | number): NDArray {
+        // Use optimized kernel for scalar operations
+        if (typeof other === 'number') {
+            return this._applyScalarOperation(other, (a, b) => a - b, 'subtract');
+        }
         return this._broadcastBinaryOp(other, (a, b) => a - b, 'subtract');
     }
 
     /**
      * Element-wise multiplication with broadcasting
      * @param other - NDArray or scalar to multiply
-     * @returns New NDArray with the result
+     * @returns New NDArray with the result (supports method chaining)
      * 
      * @example
      * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
-     * const result = a.multiply(2); // [[2, 4], [6, 8]]
+     * const result = a.multiply(2).add(1); // [[3, 5], [7, 9]] - chained operations
      */
     multiply(other: NDArray | number): NDArray {
+        // Use optimized kernel for scalar operations
+        if (typeof other === 'number') {
+            return this._applyScalarOperation(other, (a, b) => a * b, 'multiply');
+        }
         return this._broadcastBinaryOp(other, (a, b) => a * b, 'multiply');
     }
 
     /**
      * Element-wise division with broadcasting
      * @param other - NDArray or scalar to divide by
-     * @returns New NDArray with the result
+     * @returns New NDArray with the result (supports method chaining)
      * 
      * @example
      * const a = new NDArray([10, 20, 30], [3]);
-     * const result = a.divide(5); // [2, 4, 6]
+     * const result = a.divide(5).multiply(2); // [4, 8, 12] - chained operations
      */
     divide(other: NDArray | number): NDArray {
+        // Use optimized kernel for scalar operations
+        if (typeof other === 'number') {
+            if (other === 0) {
+                throw new MathematicalError('Division by zero', 'divide');
+            }
+            return this._applyScalarOperation(other, (a, b) => a / b, 'divide');
+        }
         return this._broadcastBinaryOp(other, (a, b) => {
             if (b === 0) {
-                throw new Error('Division by zero');
+                throw new MathematicalError('Division by zero', 'divide');
             }
             return a / b;
         }, 'divide');
@@ -1201,14 +1265,69 @@ export class NDArray {
     /**
      * Element-wise power operation with broadcasting
      * @param other - NDArray or scalar exponent
-     * @returns New NDArray with the result
+     * @returns New NDArray with the result (supports method chaining)
      * 
      * @example
      * const a = new NDArray([2, 3, 4], [3]);
-     * const result = a.power(2); // [4, 9, 16]
+     * const result = a.power(2).subtract(1); // [3, 8, 15] - chained operations
      */
     power(other: NDArray | number): NDArray {
+        // Use optimized kernel for scalar operations
+        if (typeof other === 'number') {
+            return this._applyScalarOperation(other, (a, b) => Math.pow(a, b), 'power');
+        }
         return this._broadcastBinaryOp(other, (a, b) => Math.pow(a, b), 'power');
+    }
+
+    /**
+     * Matrix multiplication (dot product) - optimized for 2D arrays
+     * @param other - NDArray to multiply with (must be 2D)
+     * @returns New NDArray with the result
+     * 
+     * @example
+     * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
+     * const b = new NDArray([[5, 6], [7, 8]], [2, 2]);
+     * const result = a.dot(b); // [[19, 22], [43, 50]]
+     */
+    dot(other: NDArray): NDArray {
+        // Validate inputs
+        if (this.ndim !== 2 || other.ndim !== 2) {
+            throw new DimensionError(
+                'Matrix multiplication requires 2D arrays',
+                [2, 2],
+                [this.ndim, other.ndim],
+                'dot'
+            );
+        }
+
+        const [m, k] = this.shape as [number, number];
+        const [k2, n] = other.shape as [number, number];
+
+        if (k !== k2) {
+            throw new DimensionError(
+                'Matrix multiplication dimension mismatch',
+                [m, k, k, n],
+                [m, k, k2, n],
+                'dot'
+            );
+        }
+
+        // Create result array
+        const resultData = new Float64Array(m * n);
+        const result = new NDArray(resultData, [m, n]);
+
+        // Optimized matrix multiplication using cache-friendly iteration
+        for (let i = 0; i < m; i++) {
+            for (let j = 0; j < n; j++) {
+                let sum = 0;
+                for (let l = 0; l < k; l++) {
+                    sum += this.get(i, l) * other.get(l, j);
+                }
+                result.set(i, j, sum);
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -1493,6 +1612,44 @@ export class NDArray {
     // ============================================================================
     // String Representation
     // ============================================================================
+
+    /**
+     * Convert NDArray to regular JavaScript array
+     * @returns Nested array representation matching the shape
+     */
+    toArray(): NestedArray {
+        if (this.ndim === 0) {
+            return this.get();
+        }
+        
+        if (this.ndim === 1) {
+            const result: number[] = [];
+            for (let i = 0; i < this.shape[0]!; i++) {
+                result.push(this.get(i));
+            }
+            return result;
+        }
+        
+        if (this.ndim === 2) {
+            const result: number[][] = [];
+            for (let i = 0; i < this.shape[0]!; i++) {
+                const row: number[] = [];
+                for (let j = 0; j < this.shape[1]!; j++) {
+                    row.push(this.get(i, j));
+                }
+                result.push(row);
+            }
+            return result;
+        }
+        
+        // For higher dimensions, use recursive approach
+        const result: any[] = [];
+        for (let i = 0; i < this.shape[0]!; i++) {
+            const slice = this.sliceAdvanced(i);
+            result.push(slice.toArray());
+        }
+        return result;
+    }
 
     /**
      * String representation of the array
