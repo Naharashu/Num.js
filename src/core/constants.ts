@@ -395,58 +395,6 @@ export const MATH_CONSTANTS = {
 } as const;
 
 // ============================================================================
-// Legacy Aliases for Backward Compatibility
-// ============================================================================
-
-/**
- * @deprecated Use EULER instead
- * Legacy alias for Euler's number
- */
-export const e = EULER;
-
-/**
- * @deprecated Use PI instead  
- * Legacy alias for Pi
- */
-export const pi = PI;
-
-/**
- * @deprecated Use EULER_MASCHERONI instead
- * Legacy alias for Euler-Mascheroni constant
- */
-export const y = EULER_MASCHERONI;
-
-/**
- * @deprecated Use PHI instead
- * Legacy alias for golden ratio
- */
-export const phi = PHI;
-
-/**
- * @deprecated Use KHINCHIN instead
- * Legacy alias for Khinchin's constant
- */
-export const kninchin = KHINCHIN;
-
-/**
- * @deprecated Use PLASTIC instead
- * Legacy alias for plastic constant
- */
-export const plactic = PLASTIC;
-
-/**
- * @deprecated Use APERY instead
- * Legacy alias for Apéry's constant
- */
-export const apery = APERY;
-
-/**
- * @deprecated Use CATALAN instead
- * Legacy alias for Catalan's constant
- */
-export const catalan = CATALAN;
-
-// ============================================================================
 // Utility Functions for Constants
 // ============================================================================
 

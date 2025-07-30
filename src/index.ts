@@ -4,7 +4,7 @@
  * This is the main entry point that exports all functionality from the library.
  * Provides both named exports and a default namespace export for flexibility.
  * 
- * @version 2.0.0
+ * @version 1.4.0
  * @author Num.js Contributors
  * @license MIT
  */
@@ -26,11 +26,7 @@ export type {
   ComplexNumber
 } from './types/common.js';
 
-export type {
-  MatrixLike,
-  MatrixOperations,
-  Array3dLike
-} from './types/matrix.js';
+
 
 export {
   MathematicalError,
@@ -172,24 +168,9 @@ export {
 export {
   getShape,
   getDimensions,
-  hasSameShape,
-  isBroadcastable,
-  getBroadcastShape,
-  flatten,
-  reshape,
-  transpose,
-  zeros,
-  ones,
-  full,
-  eye,
-  allEqual,
-  unique,
-  countUnique,
   isFiniteNumber,
   isNumericArray,
-  isShape,
-  isMatrixLike,
-  isArray3dLike
+  isShape
 } from './core/utilities.js';
 
 // ============================================================================
@@ -200,7 +181,7 @@ export {
   benchmark,
   compareBenchmarks,
   benchmarkArithmetic,
-  benchmarkMemoryAllocation,
+  benchmarkFactoryFunctions,
   printBenchmarkResults
 } from './core/performance.js';
 
@@ -247,12 +228,7 @@ export {
   andersonDarlingTest
 } from './core/statistics.js';
 
-// ============================================================================
-// Matrix and Array Operations
-// ============================================================================
 
-export { Matrix } from './matrix/Matrix.js';
-export { Array3d } from './matrix/Array3d.js';
 
 // ============================================================================
 // N-Dimensional Array (NumPy-like)
@@ -263,10 +239,10 @@ export type { DType, NDArrayOptions } from './ndarray/ndarray.js';
 
 // NDArray factory functions
 export {
-  zeros as ndarrayZeros,
-  ones as ndarrayOnes,
-  full as ndarrayFull,
-  eye as ndarrayEye,
+  zeros,
+  ones,
+  full,
+  eye,
   arange,
   linspace,
   fromArray,
@@ -428,8 +404,7 @@ import * as constants from './core/constants.js';
 import * as utilities from './core/utilities.js';
 import * as statistics from './core/statistics.js';
 import * as ufuncs from './core/ufuncs.js';
-import { Matrix } from './matrix/Matrix.js';
-import { Array3d } from './matrix/Array3d.js';
+
 import { NDArray } from './ndarray/ndarray.js';
 import * as factory from './ndarray/factory.js';
 import * as linalg from './linalg/linalg.js';
@@ -452,7 +427,7 @@ import * as lazy from './core/lazy.js';
  * 
  * const data = [1, 2, 3, 4, 5];
  * const avg = Num.mean(data);
- * const matrix = new Num.Matrix([[1, 2], [3, 4]]);
+ * const matrix = new Num.NDArray([[1, 2], [3, 4]], [2, 2]);
  * const det = Num.linalg.det(matrix);
  * const randomData = Num.random.normal([10], 0, 1);
  * ```
@@ -470,9 +445,7 @@ const Num = {
   // Universal functions
   ufuncs,
 
-  // Matrix classes
-  Matrix,
-  Array3d,
+
 
   // N-dimensional array
   NDArray,

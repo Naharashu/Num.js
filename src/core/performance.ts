@@ -4,7 +4,6 @@
  */
 
 import { NDArray } from '../ndarray/ndarray.js';
-import { Matrix } from '../matrix/Matrix.js';
 import { zeros, ones, random } from '../ndarray/factory.js';
 
 // ============================================================================
@@ -75,56 +74,53 @@ export function compareBenchmarks(
 // ============================================================================
 
 /**
- * Benchmark NDArray vs Matrix arithmetic operations
+ * Benchmark NDArray arithmetic operations
  */
 export function benchmarkArithmetic(size: number = 1000): BenchmarkResult[] {
     const ndarrayData = random([size, size]);
-    const matrixData = Matrix.random(size, size);
+    const ndarrayData2 = random([size, size]);
     
     return compareBenchmarks([
         {
             name: 'NDArray Addition',
-            fn: () => ndarrayData.add(2.5)
+            fn: () => ndarrayData.add(ones([size, size]))
         },
         {
-            name: 'Matrix Addition (fallback)',
-            fn: () => matrixData.add(Matrix.ones(size, size))
+            name: 'NDArray Addition (different arrays)',
+            fn: () => ndarrayData.add(ndarrayData2)
         },
         {
-            name: 'NDArray Multiplication',
-            fn: () => ndarrayData.multiply(1.5)
+            name: 'NDArray Scalar Multiplication',
+            fn: () => ndarrayData.multiply(2.5)
         },
         {
             name: 'NDArray Matrix Multiplication',
             fn: () => ndarrayData.dot(ndarrayData)
         },
         {
-            name: 'Matrix Dot Product',
-            fn: () => matrixData.dot(matrixData)
+            name: 'NDArray Element-wise Multiplication',
+            fn: () => ndarrayData.multiply(ndarrayData2)
         }
     ], 100);
 }
 
 /**
- * Benchmark memory allocation patterns
+ * Benchmark factory function performance
  */
-export function benchmarkMemoryAllocation(size: number = 10000): BenchmarkResult[] {
+export function benchmarkFactoryFunctions(size: number = 10000): BenchmarkResult[] {
+    const dim = Math.sqrt(size);
     return compareBenchmarks([
         {
             name: 'NDArray zeros()',
-            fn: () => zeros([size])
+            fn: () => zeros([dim, dim])
         },
         {
             name: 'NDArray ones()',
-            fn: () => ones([size])
+            fn: () => ones([dim, dim])
         },
         {
             name: 'NDArray random()',
-            fn: () => random([size])
-        },
-        {
-            name: 'Matrix zeros()',
-            fn: () => Matrix.zeros(Math.sqrt(size), Math.sqrt(size))
+            fn: () => random([dim, dim])
         }
     ], 1000);
 }

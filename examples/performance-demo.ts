@@ -5,14 +5,13 @@
 
 import { 
   NDArray, 
-  Matrix,
-  ndarrayZeros as zeros,
-  ndarrayOnes as ones,
+  zeros,
+  ones,
   ndarrayRandom as random,
   benchmark,
   compareBenchmarks,
   benchmarkArithmetic,
-  benchmarkMemoryAllocation,
+  benchmarkFactoryFunctions,
   printBenchmarkResults,
   lazy
 } from '../src/index.js';
@@ -29,18 +28,13 @@ console.log('=====================================');
 const size = 100;
 const ndarrayA = random([size, size]);
 const ndarrayB = random([size, size]);
-const matrixA = Matrix.random(size, size);
-const matrixB = Matrix.random(size, size);
+
 
 const matmulResults = compareBenchmarks([
   {
     name: 'NDArray.dot() (optimized)',
     fn: () => ndarrayA.dot(ndarrayB)
   },
-  {
-    name: 'Matrix.dot() (legacy)',
-    fn: () => matrixA.dot(matrixB)
-  }
 ], 10);
 
 printBenchmarkResults(matmulResults);
@@ -140,7 +134,7 @@ printBenchmarkResults(lazyResults);
 console.log('\n5️⃣ Memory Allocation Performance');
 console.log('=================================');
 
-const memoryResults = benchmarkMemoryAllocation(10000);
+const memoryResults = benchmarkFactoryFunctions(10000);
 printBenchmarkResults(memoryResults);
 
 // ============================================================================

@@ -1652,6 +1652,13 @@ export class NDArray {
     }
 
     /**
+     * Create a copy of this NDArray
+     */
+    clone(): NDArray {
+        return new NDArray(Array.from(this._data), this._shape, { dtype: this._dtype });
+    }
+
+    /**
      * String representation of the array
      */
     toString(): string {

@@ -10,7 +10,6 @@ import type {
   Shape,
   ComplexNumber 
 } from './common.js';
-import type { MatrixLike, Array3dLike } from './matrix.js';
 import { 
   InvalidParameterError, 
   DimensionError, 
@@ -311,79 +310,6 @@ export function validateNumeric3DArray(
   }
 }
 
-// ============================================================================
-// Matrix-Specific Validation
-// ============================================================================
-
-/**
- * Validate that a matrix is square
- */
-export function validateSquareMatrix(
-  matrix: MatrixLike<any>, 
-  operation: string = 'operation'
-): void {
-  if (matrix.rows !== matrix.cols) {
-    throw new DimensionError(
-      `Operation '${operation}' requires a square matrix`,
-      [matrix.rows, matrix.rows], // Expected: square
-      [matrix.rows, matrix.cols],  // Actual: rectangular
-      operation
-    );
-  }
-}
-
-/**
- * Validate matrix dimensions for element-wise operations
- */
-export function validateSameDimensions(
-  a: MatrixLike<any>, 
-  b: MatrixLike<any>, 
-  operation: string = 'operation'
-): void {
-  if (a.rows !== b.rows || a.cols !== b.cols) {
-    throw new DimensionError(
-      `Matrices must have the same dimensions for ${operation}`,
-      [a.rows, a.cols],
-      [b.rows, b.cols],
-      operation
-    );
-  }
-}
-
-/**
- * Validate matrix dimensions for multiplication
- */
-export function validateMatrixMultiplication(
-  a: MatrixLike<any>, 
-  b: MatrixLike<any>
-): void {
-  if (a.cols !== b.rows) {
-    throw new DimensionError(
-      'Matrix multiplication requires first matrix columns to equal second matrix rows',
-      [a.rows, b.cols], // Expected result shape
-      [a.rows, a.cols, b.rows, b.cols], // Actual input shapes
-      'matrix_multiplication'
-    );
-  }
-}
-
-/**
- * Validate 3D array dimensions for element-wise operations
- */
-export function validateSame3DDimensions(
-  a: Array3dLike<any>, 
-  b: Array3dLike<any>, 
-  operation: string = 'operation'
-): void {
-  if (a.x !== b.x || a.y !== b.y || a.z !== b.z) {
-    throw new DimensionError(
-      `3D arrays must have the same dimensions for ${operation}`,
-      [a.x, a.y, a.z],
-      [b.x, b.y, b.z],
-      operation
-    );
-  }
-}
 
 // ============================================================================
 // Index Validation
@@ -409,31 +335,8 @@ export function validateArrayIndex(
   }
 }
 
-/**
- * Validate matrix indices
- */
-export function validateMatrixIndices(
-  row: number, 
-  col: number, 
-  matrix: MatrixLike<any>
-): void {
-  validateArrayIndex(row, matrix.rows, 'row');
-  validateArrayIndex(col, matrix.cols, 'col');
-}
 
-/**
- * Validate 3D array indices
- */
-export function validate3DArrayIndices(
-  x: number, 
-  y: number, 
-  z: number, 
-  array: Array3dLike<any>
-): void {
-  validateArrayIndex(x, array.x, 'x');
-  validateArrayIndex(y, array.y, 'y');
-  validateArrayIndex(z, array.z, 'z');
-}
+
 
 // ============================================================================
 // Complex Number Validation
