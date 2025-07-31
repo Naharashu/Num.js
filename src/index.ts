@@ -23,7 +23,11 @@ export type {
   Dimensions,
   StatisticalOptions,
   ComparisonOptions,
-  ComplexNumber
+  ComplexNumber,
+  QRDecomposition,
+  SVDDecomposition,
+  EigenDecomposition,
+  MatrixNorm
 } from './types/common.js';
 
 
@@ -200,7 +204,7 @@ export {
   mean,
   median,
   mode,
-  standardDeviation,
+  std,
   variance,
   percentile,
   quantile,
@@ -262,7 +266,8 @@ export {
   norm,
   solve,
   isPositiveDefinite,
-  isSymmetric
+  isSymmetric,
+  luDecomposition
 } from './linalg/linalg.js';
 
 // ============================================================================

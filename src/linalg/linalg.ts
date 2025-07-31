@@ -53,7 +53,7 @@ function validate2DNDArray(matrix: NDArray, operation: string): void {
 /**
  * LU decomposition with partial pivoting for NDArray
  */
-function luDecomposition(matrix: NDArray): { L: NDArray; U: NDArray; P: number[] } {
+export function luDecomposition(matrix: NDArray): { L: NDArray; U: NDArray; P: number[] } {
   validateSquareNDArray(matrix, 'LU decomposition');
   const n = matrix.shape[0] as number; // Safe after validation
   const L = fromArray(Array.from({ length: n }, (_, i) => 

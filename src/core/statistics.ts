@@ -477,11 +477,11 @@ export function variance(arr: NumericArray | NumericMatrix, options: Statistical
  * @returns The standard deviation or array of standard deviations along specified axis
  * 
  * @example
- * standardDeviation([1, 2, 3, 4, 5]) // ~1.58 (population std dev)
- * standardDeviation([1, 2, 3, 4, 5], { ddof: 1 }) // ~1.58 (sample std dev)
- * standardDeviation([[1, 2], [3, 4]], { axis: 0 }) // [1, 1] (column std devs)
+ * std([1, 2, 3, 4, 5]) // ~1.58 (population std dev)
+ * std([1, 2, 3, 4, 5], { ddof: 1 }) // ~1.58 (sample std dev)
+ * std([[1, 2], [3, 4]], { axis: 0 }) // [1, 1] (column std devs)
  */
-export function standardDeviation(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
+export function std(arr: NumericArray | NumericMatrix, options: StatisticalOptions = {}): number | NumericArray {
   const varianceValue = variance(arr, options);
   
   if (typeof varianceValue === 'number') {
@@ -869,7 +869,7 @@ export function skewness(arr: NumericArray, options: StatisticalOptions = {}): n
   }
   
   const arrayMean = mean(arr) as number;
-  const arrayStd = standardDeviation(arr, options) as number;
+  const arrayStd = std(arr, options) as number;
   
   if (arrayStd === 0) {
     throw new MathematicalError('Cannot calculate skewness with zero standard deviation', 'skewness');
@@ -910,7 +910,7 @@ export function kurtosis(arr: NumericArray, options: StatisticalOptions = {}): n
   }
   
   const arrayMean = mean(arr) as number;
-  const arrayStd = standardDeviation(arr, options) as number;
+  const arrayStd = std(arr, options) as number;
   
   if (arrayStd === 0) {
     throw new MathematicalError('Cannot calculate kurtosis with zero standard deviation', 'kurtosis');
@@ -1003,8 +1003,8 @@ export function covariance(x: NumericArray, y: NumericArray, options: Statistica
  */
 export function correlation(x: NumericArray, y: NumericArray): number {
   const cov = covariance(x, y);
-  const stdX = standardDeviation(x) as number;
-  const stdY = standardDeviation(y) as number;
+  const stdX = std(x) as number;
+  const stdY = std(y) as number;
   
   if (stdX === 0 || stdY === 0) {
     throw new MathematicalError(
@@ -1036,7 +1036,7 @@ export function correlation(x: NumericArray, y: NumericArray): number {
  * //   max: 5,
  * //   range: 4,
  * //   variance: 2.5,
- * //   standardDeviation: 1.58,
+ * //   std: 1.58,
  * //   skewness: 0,
  * //   kurtosis: -1.2
  * // }
@@ -1050,7 +1050,7 @@ export function summary(arr: NumericArray): {
   max: number;
   range: number;
   variance: number;
-  standardDeviation: number;
+  std: number;
   q1: number;
   q3: number;
   iqr: number;
@@ -1072,7 +1072,7 @@ export function summary(arr: NumericArray): {
     max: max(arr) as number,
     range: range(arr),
     variance: variance(arr) as number,
-    standardDeviation: standardDeviation(arr) as number,
+    std: std(arr) as number,
     q1: quantile(arr, 0.25),
     q3: quantile(arr, 0.75),
     iqr: iqr(arr),
@@ -1178,7 +1178,7 @@ export function quantiles(arr: NumericArray, quantiles: NumericArray): NumericAr
  */
 export function coefficientOfVariation(arr: NumericArray, options: StatisticalOptions = {}): number {
   const arrayMean = mean(arr) as number;
-  const arrayStd = standardDeviation(arr, options) as number;
+  const arrayStd = std(arr, options) as number;
   
   if (arrayMean === 0) {
     throw new MathematicalError('Cannot calculate coefficient of variation with zero mean', 'coefficientOfVariation');
@@ -1537,7 +1537,7 @@ export function andersonDarlingTest(arr: NumericArray): number {
   const n = arr.length;
   const sorted = [...arr].sort((a, b) => a - b);
   const arrayMean = mean(arr) as number;
-  const arrayStd = standardDeviation(arr) as number;
+  const arrayStd = std(arr) as number;
   
   let sum = 0;
   for (let i = 0; i < n; i++) {
