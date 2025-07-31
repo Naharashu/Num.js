@@ -237,7 +237,7 @@ export {
 export { NDArray } from './ndarray/ndarray.js';
 export type { DType, NDArrayOptions } from './ndarray/ndarray.js';
 
-// NDArray factory functions
+// NDArray factory functions - exported with preserved generic types
 export {
   zeros,
   ones,
@@ -246,7 +246,7 @@ export {
   arange,
   linspace,
   fromArray,
-  random as ndarrayRandom
+  random
 } from './ndarray/factory.js';
 
 // ============================================================================
@@ -271,7 +271,7 @@ export {
 
 export {
   randin,
-  random,
+  random as randomFloat,
   randint,
   randomArray,
   uniform,

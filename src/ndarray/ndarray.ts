@@ -3,80 +3,39 @@
  * Provides a unified, NumPy-like ndarray class with efficient memory layout
  */
 
-import type {
-    Shape
+import {
+  Shape,
+  DType,
+  DTypeMap,
+  TypedArray,
+  DTYPE_CONSTRUCTORS,
 } from '../types/common.js';
 import {
-    DimensionError,
-    InvalidParameterError,
-    IndexOutOfBoundsError,
-    MathematicalError
+  DimensionError,
+  InvalidParameterError,
+  IndexOutOfBoundsError,
+  MathematicalError,
 } from '../types/errors.js';
-import {
-    validateFiniteNumber,
-    validateShape
-} from '../types/validation.js';
+import { validateShape, validateFiniteNumber } from '../types/validation.js';
 
 // ============================================================================
 // Type Definitions for ndarray
 // ============================================================================
 
-/** Supported data types for ndarray */
-export type DType = 'float64' | 'float32' | 'int32' | 'int16' | 'int8' | 'uint32' | 'uint16' | 'uint8';
-
-/** TypedArray constructor types */
-export type TypedArrayConstructor =
-    | Float64ArrayConstructor
-    | Float32ArrayConstructor
-    | Int32ArrayConstructor
-    | Int16ArrayConstructor
-    | Int8ArrayConstructor
-    | Uint32ArrayConstructor
-    | Uint16ArrayConstructor
-    | Uint8ArrayConstructor;
-
-/** Union of all TypedArray types */
-export type TypedArrayLike =
-    | Float64Array
-    | Float32Array
-    | Int32Array
-    | Int16Array
-    | Int8Array
-    | Uint32Array
-    | Uint16Array
-    | Uint8Array;
-
 /** Nested array types for arbitrary dimensions */
-export type NestedArray = number | number[] | number[][] | number[][][];
+export type NestedArray<T = number> =
+  | T
+  | T[]
+  | T[][]
+  | T[][][]
+  | T[][][][];
 
 /** Configuration options for ndarray creation */
-export interface NDArrayOptions {
-    /** Data type for the array elements */
-    dtype?: DType;
-    /** Whether the array should be read-only */
-    readonly?: boolean;
-}
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-/**
- * Get the TypedArray constructor for a given dtype
- */
-function getTypedArrayConstructor(dtype: DType): TypedArrayConstructor {
-    switch (dtype) {
-        case 'float64': return Float64Array;
-        case 'float32': return Float32Array;
-        case 'int32': return Int32Array;
-        case 'int16': return Int16Array;
-        case 'int8': return Int8Array;
-        case 'uint32': return Uint32Array;
-        case 'uint16': return Uint16Array;
-        case 'uint8': return Uint8Array;
-        default:
-            throw new InvalidParameterError('dtype', 'valid data type', dtype);
-    }
+export interface NDArrayOptions<T extends DType> {
+  /** Data type for the array elements */
+  dtype?: T;
+  /** Whether the array should be read-only */
+  readonly?: boolean;
 }
 
 /**
@@ -142,24 +101,30 @@ function indicesToOffset(indices: number[], strides: number[]): number {
  * - Zero-copy views for reshape/transpose operations
  * - Cache-friendly matrix multiplication
  */
-export class NDArray {
-    /** Flat data buffer storing all elements */
-    private readonly _data: TypedArrayLike;
+export class NDArray<T extends DType = 'float64'> {
+  /** Flat data buffer storing all elements */
+  public readonly data: DTypeMap[T];
 
-    /** Shape tuple describing dimensions */
-    private readonly _shape: Shape;
+  /** Shape tuple describing dimensions */
+  public readonly shape: Shape;
 
-    /** Strides tuple for memory layout */
-    private readonly _strides: number[];
+  /** Strides tuple for memory layout */
+  public readonly strides: readonly number[];
 
-    /** Data type of array elements */
-    private readonly _dtype: DType;
+  /** Data type of array elements */
+  public readonly dtype: T;
 
-    /** Whether this array is read-only */
-    private readonly _readonly: boolean;
+  /** Whether this array is read-only */
+  public readonly readonly: boolean;
 
-    /** Offset into the data buffer (for views) */
-    private readonly _offset: number;
+  /** Offset into the data buffer (for views) */
+  public readonly offset: number;
+
+  /** Number of dimensions */
+  public readonly ndim: number;
+
+  /** Total number of elements */
+  public readonly size: number;
 
     // ============================================================================
     // Constructor
@@ -171,89 +136,76 @@ export class NDArray {
      * @param shape - Shape of the array
      * @param options - Configuration options
      */
-    constructor(
-        data: TypedArrayLike | NestedArray,
-        shape: Shape,
-        options: NDArrayOptions = {}
-    ) {
-        const { dtype = 'float64', readonly = false } = options;
+  constructor(
+    data: DTypeMap[T] | NestedArray | NDArray<T>,
+    shape?: Shape,
+    dtype: T = 'float64' as T,
+    offset = 0,
+    strides?: readonly number[],
+    readonly = false
+  ) {
+    if (data instanceof NDArray) {
+      // Create a view or copy from another NDArray
+      this.data = data.data;
+      this.shape = shape || data.shape;
+      this.dtype = dtype || data.dtype;
+      this.offset = offset || data.offset;
+      this.strides = strides || data.strides;
+      this.readonly = readonly || data.readonly;
+    } else {
+      // Create a new NDArray from raw data
+      validateShape(shape!);
+      this.shape = shape!;
+      this.dtype = dtype;
+      this.offset = offset;
+      this.readonly = readonly;
+      this.strides = strides || calculateStrides(this.shape);
 
-        // Validate shape
-        validateShape(shape);
+      const expectedSize = calculateSize(this.shape);
+      const Ctor = DTYPE_CONSTRUCTORS[this.dtype];
 
-        this._shape = [...shape]; // Create defensive copy
-        this._strides = calculateStrides(this._shape);
-        this._dtype = dtype;
-        this._readonly = readonly;
-        this._offset = 0;
-
-        const expectedSize = calculateSize(this._shape);
-
-        if (data instanceof Float64Array || data instanceof Float32Array ||
-            data instanceof Int32Array || data instanceof Int16Array ||
-            data instanceof Int8Array || data instanceof Uint32Array ||
-            data instanceof Uint16Array || data instanceof Uint8Array) {
-            // Handle TypedArray input
-            if (data.length !== expectedSize) {
-                throw new DimensionError(
-                    `Data size (${data.length}) doesn't match shape size (${expectedSize})`,
-                    [expectedSize],
-                    [data.length]
-                );
-            }
-
-            // Create a copy to ensure immutability of the original
-            const TypedArrayCtor = getTypedArrayConstructor(dtype);
-            this._data = new TypedArrayCtor(data);
-        } else {
-            // Handle nested array input (number, number[], number[][], etc.)
-            const flatData = this._flattenNestedArray(data);
-            if (flatData.length !== expectedSize) {
-                throw new DimensionError(
-                    `Data size (${flatData.length}) doesn't match shape size (${expectedSize})`,
-                    [expectedSize],
-                    [flatData.length]
-                );
-            }
-
-            const TypedArrayCtor = getTypedArrayConstructor(dtype);
-            this._data = new TypedArrayCtor(flatData);
+      if (Array.isArray(data) || typeof data === 'number') {
+        const flatData = this._flattenNestedArray(data as NestedArray);
+        if (flatData.length !== expectedSize) {
+          throw new DimensionError(
+            `Data size (${flatData.length}) doesn't match shape size (${expectedSize})`,
+            [expectedSize],
+            [flatData.length]
+          );
         }
+        this.data = new Ctor(flatData.length);
+        for (let i = 0; i < flatData.length; i++) {
+          this.data[i] = flatData[i]!;
+        }
+      } else {
+        if (data.length !== expectedSize) {
+          throw new DimensionError(
+            `Data size (${data.length}) doesn't match shape size (${expectedSize})`,
+            [expectedSize],
+            [data.length]
+          );
+        }
+        this.data = new Ctor(data.length);
+        for (let i = 0; i < data.length; i++) {
+          this.data[i] = data[i]!;
+        }
+      }
     }
 
-    // ============================================================================
-    // Properties
-    // ============================================================================
+    this.ndim = this.shape.length;
+    this.size = calculateSize(this.shape);
 
-    /** Get the shape of the array */
-    get shape(): Shape {
-        return [...this._shape]; // Return defensive copy
+    // Final validation
+    if (this.strides.length !== this.ndim) {
+      throw new DimensionError(
+        `Strides length (${this.strides.length}) must match number of dimensions (${this.ndim})`,
+        [this.ndim],
+        [this.strides.length]
+      );
     }
+  }
 
-    /** Get the strides of the array */
-    get strides(): number[] {
-        return [...this._strides]; // Return defensive copy
-    }
 
-    /** Get the data type */
-    get dtype(): DType {
-        return this._dtype;
-    }
-
-    /** Get the number of dimensions */
-    get ndim(): number {
-        return this._shape.length;
-    }
-
-    /** Get the total number of elements */
-    get size(): number {
-        return calculateSize(this._shape);
-    }
-
-    /** Check if the array is read-only */
-    get readonly(): boolean {
-        return this._readonly;
-    }
 
     // ============================================================================
     // Element Access
@@ -266,8 +218,8 @@ export class NDArray {
      */
     get(...indices: number[]): number {
         this._validateIndices(indices);
-        const offset = this._offset + indicesToOffset(indices, this._strides);
-        return this._data[offset]!; // Safe because offset is calculated from validated indices
+        const offset = this.offset + indicesToOffset(indices, [...this.strides]);
+        return this.data[offset]!;
     }
 
     /**
@@ -275,7 +227,7 @@ export class NDArray {
      * @param indices - Mix of numbers and strings for indexing
      * @returns Single element (number) or NDArray slice
      */
-    getAdvanced(...indices: (number | string)[]): NDArray | number {
+    getAdvanced(...indices: (number | string)[]): NDArray<T> | number {
         // If all indices are numbers, use the basic get method
         if (indices.every(idx => typeof idx === 'number')) {
             return this.get(...(indices as number[]));
@@ -290,7 +242,7 @@ export class NDArray {
      * @param slices - Array of slice specifications (mix of numbers, strings, and arrays)
      * @returns A new NDArray view of the sliced data
      */
-    sliceAdvanced(...slices: Array<number | string | [number, number] | [number, number, number]>): NDArray {
+    sliceAdvanced(...slices: Array<number | string | [number, number] | [number, number, number]>): NDArray<T> {
         if (slices.length > this.ndim) {
             throw new DimensionError(
                 `Too many slice dimensions (${slices.length}) for array with ${this.ndim} dimensions`,
@@ -301,7 +253,7 @@ export class NDArray {
 
         const newShape: number[] = [];
         const newStrides: number[] = [];
-        let newOffset = this._offset;
+        let newOffset = this.offset;
 
         // Process each dimension
         for (let i = 0; i < this.ndim; i++) {
@@ -319,25 +271,20 @@ export class NDArray {
                 newOffset += sliceResult.offset;
             } else {
                 // No slice specified for this dimension - include entire dimension
-                newShape.push(this._shape[i]!);
-                newStrides.push(this._strides[i]!);
+                newShape.push(this.shape[i]!);
+                newStrides.push(this.strides[i]!);
             }
         }
 
-        // Create a new NDArray that shares the same data buffer
-        const sliced = Object.create(NDArray.prototype) as NDArray;
-
-        // Share the same data buffer with new offset
-        (sliced as any)._data = this._data;
-        (sliced as any)._offset = newOffset;
-        (sliced as any)._dtype = this._dtype;
-        (sliced as any)._readonly = this._readonly;
-
-        // Set new shape and strides
-        (sliced as any)._shape = newShape;
-        (sliced as any)._strides = newStrides;
-
-        return sliced;
+        // Create a new NDArray view that shares the same data buffer
+        return new NDArray<T>(
+          this.data,
+          newShape,
+          this.dtype,
+          newOffset,
+          newStrides,
+          this.readonly
+        );
     }
 
     /**
@@ -345,7 +292,7 @@ export class NDArray {
      * @param indices - Arrays of indices for each dimension
      * @returns NDArray with selected elements
      */
-    fancyIndex(...indices: number[][]): NDArray {
+    fancyIndex(...indices: number[][]): NDArray<T> {
         if (indices.length === 0) {
             throw new InvalidParameterError('indices', 'at least one index array', 'empty');
         }
@@ -376,13 +323,13 @@ export class NDArray {
                 if (!Number.isInteger(idx)) {
                     throw new InvalidParameterError(`indices[${dim}]`, 'array of integers', typeof idx);
                 }
-                return this._normalizeIndex(idx, this._shape[dim]!, dim);
+                return this._normalizeIndex(idx, this.shape[dim]!, dim);
             });
         });
 
         // Create result array
         const resultShape: Shape = [resultLength];
-        const resultData = new (this._data.constructor as any)(resultLength);
+        const resultData = new (DTYPE_CONSTRUCTORS[this.dtype])(resultLength);
 
         // Extract elements
         for (let i = 0; i < resultLength; i++) {
@@ -393,11 +340,11 @@ export class NDArray {
                 elementIndices.push(0);
             }
 
-            const offset = this._offset + indicesToOffset(elementIndices, this._strides);
-            resultData[i] = this._data[offset];
+            const offset = this.offset + indicesToOffset(elementIndices, [...this.strides]);
+            resultData[i] = this.data[offset]!;
         }
 
-        return new NDArray(resultData, resultShape, { dtype: this._dtype, readonly: this._readonly });
+        return new NDArray<T>(resultData, resultShape, this.dtype, 0, undefined, this.readonly);
     }
 
     /**
@@ -405,48 +352,31 @@ export class NDArray {
      * @param boolArray - Boolean array for indexing (must match array size)
      * @returns NDArray with selected elements
      */
-    booleanIndex(boolArray: boolean[]): NDArray {
+    booleanIndex(boolArray: boolean[]): NDArray<T> {
         if (!Array.isArray(boolArray)) {
             throw new InvalidParameterError('boolArray', 'array of booleans', typeof boolArray);
         }
 
         if (boolArray.length !== this.size) {
             throw new DimensionError(
-                'Boolean array length must match array size',
+                `Boolean index array size (${boolArray.length}) must match array size (${this.size})`,
                 [this.size],
                 [boolArray.length]
             );
         }
 
-        // Validate boolean array
-        for (let i = 0; i < boolArray.length; i++) {
-            if (typeof boolArray[i] !== 'boolean') {
-                throw new InvalidParameterError(`boolArray[${i}]`, 'boolean', typeof boolArray[i]);
-            }
-        }
+        const trueCount = boolArray.filter(Boolean).length;
+        const resultData = new (DTYPE_CONSTRUCTORS[this.dtype])(trueCount);
+        let resultIdx = 0;
 
-        // Count true values to determine result size
-        const trueCount = boolArray.filter(b => b).length;
-        
-        if (trueCount === 0) {
-            // Return empty array
-            const resultData = new (this._data.constructor as any)(0);
-            return new NDArray(resultData, [0], { dtype: this._dtype, readonly: this._readonly });
-        }
-
-        // Create result array
-        const resultData = new (this._data.constructor as any)(trueCount);
-        let resultIndex = 0;
-
-        // Extract elements where boolean is true
-        for (let i = 0; i < boolArray.length; i++) {
+        for (let i = 0; i < this.size; i++) {
             if (boolArray[i]) {
-                const offset = this._offset + i;
-                resultData[resultIndex++] = this._data[offset];
+                // This assumes a flat, C-style iteration. A more robust implementation would use this.get with multi-dimensional indices.
+                resultData[resultIdx++] = this.data[this.offset + i]!;
             }
         }
 
-        return new NDArray(resultData, [trueCount], { dtype: this._dtype, readonly: this._readonly });
+        return new NDArray<T>(resultData, [trueCount], this.dtype);
     }
 
     /**
@@ -454,22 +384,25 @@ export class NDArray {
      * @param indices - Multi-dimensional indices followed by the value
      */
     set(...args: number[]): void {
-        if (this._readonly) {
-            throw new MathematicalError('Cannot modify read-only array', 'set');
+        if (this.readonly) {
+            throw new Error('Cannot set values in a read-only array');
         }
 
-        if (args.length < 2) {
-            throw new InvalidParameterError('arguments', 'at least 2 arguments (indices and value)', args.length);
+        if (args.length !== this.ndim + 1) {
+            throw new InvalidParameterError(
+                'set arguments',
+                `${this.ndim} indices and 1 value`,
+                `${args.length} arguments`
+            );
         }
 
-        const value = args[args.length - 1];
-        const indices = args.slice(0, -1);
+        const value = args.pop()!;
+        const indices = args;
 
-        validateFiniteNumber(value, 'value');
         this._validateIndices(indices);
 
-        const offset = this._offset + indicesToOffset(indices, this._strides);
-        this._data[offset] = value;
+        const offset = this.offset + indicesToOffset(indices, [...this.strides]);
+        this.data[offset] = value;
     }
 
     // ============================================================================
@@ -502,31 +435,25 @@ export class NDArray {
      * Validate multi-dimensional indices
      */
     private _validateIndices(indices: number[]): void {
-        if (indices.length !== this._shape.length) {
+        if (indices.length !== this.ndim) {
             throw new DimensionError(
-                `Expected ${this._shape.length} indices, got ${indices.length}`,
-                [this._shape.length],
+                `Index dimensions (${indices.length}) don't match array dimensions (${this.ndim})`,
+                [this.ndim],
                 [indices.length]
             );
         }
 
-        for (let i = 0; i < indices.length; i++) {
-            const index = indices[i]!; // Safe because we validated length above
-            const dim = this._shape[i]!; // Safe because we validated length above
+        for (let i = 0; i < this.ndim; i++) {
+            const index = indices[i]!;
+            const dimSize = this.shape[i]!;
 
             if (!Number.isInteger(index)) {
-                throw new InvalidParameterError(`index[${i}]`, 'integer', index);
+                throw new InvalidParameterError(`indices[${i}]`, 'integer', typeof index);
             }
 
-            // Handle negative indexing
-            const normalizedIndex = index < 0 ? dim + index : index;
-
-            if (normalizedIndex < 0 || normalizedIndex >= dim) {
-                throw new IndexOutOfBoundsError(index, dim, i);
+            if (index < 0 || index >= dimSize) {
+                throw new IndexOutOfBoundsError(i, index, dimSize);
             }
-
-            // Update the index in place for further processing
-            indices[i] = normalizedIndex;
         }
     }
 
@@ -611,31 +538,27 @@ export class NDArray {
         dimIndex: number,
         sliceSpec: number | string | [number, number] | [number, number, number]
     ): { size: number; offset: number; stride: number } {
-        const dimSize = this._shape[dimIndex]!;
-        const originalStride = this._strides[dimIndex]!;
+        const dimSize = this.shape[dimIndex]!;
+        const originalStride = this.strides[dimIndex]!;
 
         if (typeof sliceSpec === 'number') {
-            // Single index - dimension is eliminated
+            // Single index - return single element
             const normalizedIndex = this._normalizeIndex(sliceSpec, dimSize, dimIndex);
             return {
-                size: -1, // Special marker for dimension elimination
+                size: 1,
                 offset: normalizedIndex * originalStride,
                 stride: originalStride
             };
-        }
-
-        if (typeof sliceSpec === 'string') {
-            // Parse string slice
+        } else if (typeof sliceSpec === 'string') {
+            // String slice like "1:5" or "::2"
             const rangeSlice = this._parseStringSlice(sliceSpec);
             return this._applyRangeSlice(rangeSlice, dimSize, originalStride, dimIndex);
-        }
-
-        if (Array.isArray(sliceSpec)) {
-            // Range slice
+        } else if (Array.isArray(sliceSpec)) {
+            // Array slice like [1, 5] or [1, 5, 2]
             return this._applyRangeSlice(sliceSpec, dimSize, originalStride, dimIndex);
+        } else {
+            throw new InvalidParameterError('sliceSpec', 'number, string, or array', typeof sliceSpec);
         }
-
-        throw new InvalidParameterError('sliceSpec', 'number, string, or array', typeof sliceSpec);
     }
 
     /**
@@ -782,14 +705,14 @@ export class NDArray {
         const reshaped = Object.create(NDArray.prototype) as NDArray;
 
         // Share the same data buffer and offset
-        (reshaped as any)._data = this._data;
-        (reshaped as any)._offset = this._offset;
-        (reshaped as any)._dtype = this._dtype;
-        (reshaped as any)._readonly = this._readonly;
+        (reshaped as any).data = this.data;
+        (reshaped as any).offset = this.offset;
+        (reshaped as any).dtype = this.dtype;
+        (reshaped as any).readonly = this.readonly;
 
         // Calculate new shape and strides
-        (reshaped as any)._shape = [...newShape];
-        (reshaped as any)._strides = calculateStrides(newShape);
+        (reshaped as any).shape = [...newShape];
+        (reshaped as any).strides = calculateStrides(newShape);
 
         return reshaped;
     }
@@ -801,7 +724,7 @@ export class NDArray {
      * @param axes - Optional array specifying the permutation of axes
      * @returns A new NDArray view that is transposed
      */
-    transpose(axes?: number[]): NDArray {
+    transpose(axes?: number[]): NDArray<T> {
         let newShape: Shape;
         let newStrides: number[];
 
@@ -828,26 +751,26 @@ export class NDArray {
             }
 
             // Permute shape and strides according to axes
-            newShape = axes.map(axis => this._shape[axis]!);
-            newStrides = axes.map(axis => this._strides[axis]!);
+            newShape = axes.map(axis => this.shape[axis]!);
+            newStrides = axes.map(axis => this.strides[axis]!);
         } else {
             // Default: reverse all axes
-            newShape = [...this._shape].reverse();
-            newStrides = [...this._strides].reverse();
+            newShape = [...this.shape].reverse();
+            newStrides = [...this.strides].reverse();
         }
 
         // Create a new NDArray that shares the same data buffer
-        const transposed = Object.create(NDArray.prototype) as NDArray;
+        const transposed = Object.create(NDArray.prototype) as NDArray<T>;
 
         // Share the same data buffer and offset
-        (transposed as any)._data = this._data;
-        (transposed as any)._offset = this._offset;
-        (transposed as any)._dtype = this._dtype;
-        (transposed as any)._readonly = this._readonly;
+        (transposed as any).data = this.data;
+        (transposed as any).offset = this.offset;
+        (transposed as any).dtype = this.dtype;
+        (transposed as any).readonly = this.readonly;
 
         // Set new shape and strides
-        (transposed as any)._shape = newShape;
-        (transposed as any)._strides = newStrides;
+        (transposed as any).shape = newShape;
+        (transposed as any).strides = newStrides;
 
         return transposed;
     }
@@ -868,11 +791,11 @@ export class NDArray {
 
         const newShape: number[] = [];
         const newStrides: number[] = [];
-        let newOffset = this._offset;
+        let newOffset = this.offset;
 
         for (let i = 0; i < this.ndim; i++) {
-            const dimSize = this._shape[i]!;
-            const stride = this._strides[i]!;
+            const dimSize = this.shape[i]!;
+            const stride = this.strides[i]!;
 
             if (i < slices.length) {
                 const slice = slices[i]!;
@@ -921,14 +844,14 @@ export class NDArray {
         const sliced = Object.create(NDArray.prototype) as NDArray;
 
         // Share the same data buffer with new offset
-        (sliced as any)._data = this._data;
-        (sliced as any)._offset = newOffset;
-        (sliced as any)._dtype = this._dtype;
-        (sliced as any)._readonly = this._readonly;
+        (sliced as any).data = this.data;
+        (sliced as any).offset = newOffset;
+        (sliced as any).dtype = this.dtype;
+        (sliced as any).readonly = this.readonly;
 
         // Set new shape and strides
-        (sliced as any)._shape = newShape;
-        (sliced as any)._strides = newStrides;
+        (sliced as any).shape = newShape;
+        (sliced as any).strides = newStrides;
 
         return sliced;
     }
@@ -942,12 +865,12 @@ export class NDArray {
         const view = Object.create(NDArray.prototype) as NDArray;
 
         // Share all properties
-        (view as any)._data = this._data;
-        (view as any)._offset = this._offset;
-        (view as any)._dtype = this._dtype;
-        (view as any)._readonly = this._readonly;
-        (view as any)._shape = [...this._shape];
-        (view as any)._strides = [...this._strides];
+        (view as any).data = this.data;
+        (view as any).offset = this.offset;
+        (view as any).dtype = this.dtype;
+        (view as any).readonly = this.readonly;
+        (view as any).shape = [...this.shape];
+        (view as any).strides = [...this.strides];
 
         return view;
     }
@@ -958,7 +881,7 @@ export class NDArray {
      * @returns True if both arrays share the same underlying buffer
      */
     sharesDataWith(other: NDArray): boolean {
-        return this._data === (other as any)._data;
+        return this.data === (other as any).data;
     }
 
     // ============================================================================
@@ -970,13 +893,13 @@ export class NDArray {
      * @param other - Another NDArray or scalar
      * @returns True if broadcasting is possible
      */
-    private _canBroadcastWith(other: NDArray | number): boolean {
+    private _canBroadcastWith(other: NDArray<T> | number): boolean {
         if (typeof other === 'number') {
             return true; // Scalars can always be broadcast
         }
 
-        const thisShape = this._shape;
-        const otherShape = other._shape;
+        const thisShape = this.shape;
+        const otherShape = other.shape;
         const maxLen = Math.max(thisShape.length, otherShape.length);
 
         // Pad shapes with 1s on the left to make them the same length
@@ -1002,22 +925,22 @@ export class NDArray {
      * @param other - Another NDArray or scalar
      * @returns Resulting broadcast shape
      */
-    private _getBroadcastShape(other: NDArray | number): Shape {
+    private _getBroadcastShape(other: NDArray<T> | number): Shape {
         if (typeof other === 'number') {
-            return [...this._shape]; // Scalar broadcasting preserves this shape
+            return [...this.shape]; // Scalar broadcasting preserves this shape
         }
 
         if (!this._canBroadcastWith(other)) {
             throw new DimensionError(
                 'Arrays cannot be broadcast together',
-                this._shape,
-                other._shape,
+                this.shape,
+                other.shape,
                 'broadcasting'
             );
         }
 
-        const thisShape = this._shape;
-        const otherShape = other._shape;
+        const thisShape = this.shape;
+        const otherShape = other.shape;
         const maxLen = Math.max(thisShape.length, otherShape.length);
         const paddedThis = [...Array(maxLen - thisShape.length).fill(1), ...thisShape];
         const paddedOther = [...Array(maxLen - otherShape.length).fill(1), ...otherShape];
@@ -1038,19 +961,19 @@ export class NDArray {
      * @returns New NDArray with the result
      */
     _broadcastBinaryOp(
-        other: NDArray | number,
+        other: NDArray<T> | number,
         operation: (a: number, b: number) => number,
         operationName: string
-    ): NDArray {
+    ): NDArray<T> {
         const resultShape = this._getBroadcastShape(other);
         const resultSize = calculateSize(resultShape);
-        const TypedArrayCtor = getTypedArrayConstructor(this._dtype);
+        const TypedArrayCtor = DTYPE_CONSTRUCTORS[this.dtype];
         const resultData = new TypedArrayCtor(resultSize);
 
         if (typeof other === 'number') {
             // Scalar broadcasting - simple case
             for (let i = 0; i < this.size; i++) {
-                const thisValue = this._data[this._offset + i];
+                const thisValue = this.data[this.offset + i];
                 if (thisValue === undefined) {
                     throw new MathematicalError(`Invalid data access at index ${i}`, operationName);
                 }
@@ -1060,7 +983,7 @@ export class NDArray {
                     throw new MathematicalError(`Operation failed: ${error}`, operationName);
                 }
             }
-            return new NDArray(resultData, this._shape, { dtype: this._dtype });
+            return new NDArray<T>(resultData, this.shape, this.dtype);
         }
 
         // Array broadcasting - more complex case
@@ -1072,15 +995,15 @@ export class NDArray {
             const resultIndices = this._flatIndexToIndices(i, resultShape, resultStrides);
             
             // Map result indices to source array indices
-            const thisIndices = this._mapBroadcastIndices(resultIndices, this._shape);
-            const otherIndices = this._mapBroadcastIndices(resultIndices, other._shape);
+            const thisIndices = this._mapBroadcastIndices(resultIndices, this.shape);
+            const otherIndices = this._mapBroadcastIndices(resultIndices, other.shape);
             
             // Get values from both arrays
-            const thisOffset = this._offset + indicesToOffset(thisIndices, this._strides);
-            const otherOffset = other._offset + indicesToOffset(otherIndices, other._strides);
+            const thisOffset = this.offset + indicesToOffset(thisIndices, [...this.strides]);
+            const otherOffset = other.offset + indicesToOffset(otherIndices, [...other.strides]);
             
-            const thisValue = this._data[thisOffset];
-            const otherValue = other._data[otherOffset];
+            const thisValue = this.data[thisOffset];
+            const otherValue = other.data[otherOffset];
             
             if (thisValue === undefined || otherValue === undefined) {
                 throw new MathematicalError(`Invalid data access during broadcasting`, operationName);
@@ -1093,7 +1016,7 @@ export class NDArray {
             }
         }
 
-        return new NDArray(resultData, resultShape, { dtype: this._dtype });
+        return new NDArray<T>(resultData, resultShape, this.dtype);
     }
 
     /**
@@ -1158,12 +1081,12 @@ export class NDArray {
         scalar: number,
         operation: (a: number, b: number) => number,
         operationName: string
-    ): NDArray {
+    ): NDArray<T> {
         const size = this.size;
-        const TypedArrayCtor = getTypedArrayConstructor(this._dtype);
+        const TypedArrayCtor = DTYPE_CONSTRUCTORS[this.dtype];
         const resultData = new TypedArrayCtor(size);
-        const sourceData = this._data;
-        const offset = this._offset;
+        const sourceData = this.data;
+        const offset = this.offset;
         
         // Optimized loop - JIT compiler can optimize simple for loops better
         for (let i = 0; i < size; i++) {
@@ -1178,7 +1101,7 @@ export class NDArray {
             }
         }
         
-        return new NDArray(resultData, this._shape, { dtype: this._dtype });
+        return new NDArray<T>(resultData, this.shape, this.dtype);
     }
 
     // ============================================================================
@@ -1195,7 +1118,7 @@ export class NDArray {
      * const b = new NDArray([10], [1]);
      * const result = a.add(b).multiply(2); // [22, 24, 26] - chained operations
      */
-    add(other: NDArray | number): NDArray {
+    add(other: NDArray<T> | number): NDArray<T> {
         // Use optimized kernel for scalar operations
         if (typeof other === 'number') {
             return this._applyScalarOperation(other, (a, b) => a + b, 'add');
@@ -1212,7 +1135,7 @@ export class NDArray {
      * const a = new NDArray([5, 6, 7], [3]);
      * const result = a.subtract(2).add(1); // [4, 5, 6] - chained operations
      */
-    subtract(other: NDArray | number): NDArray {
+    subtract(other: NDArray<T> | number): NDArray<T> {
         // Use optimized kernel for scalar operations
         if (typeof other === 'number') {
             return this._applyScalarOperation(other, (a, b) => a - b, 'subtract');
@@ -1229,7 +1152,7 @@ export class NDArray {
      * const a = new NDArray([[1, 2], [3, 4]], [2, 2]);
      * const result = a.multiply(2).add(1); // [[3, 5], [7, 9]] - chained operations
      */
-    multiply(other: NDArray | number): NDArray {
+    multiply(other: NDArray<T> | number): NDArray<T> {
         // Use optimized kernel for scalar operations
         if (typeof other === 'number') {
             return this._applyScalarOperation(other, (a, b) => a * b, 'multiply');
@@ -1246,7 +1169,7 @@ export class NDArray {
      * const a = new NDArray([10, 20, 30], [3]);
      * const result = a.divide(5).multiply(2); // [4, 8, 12] - chained operations
      */
-    divide(other: NDArray | number): NDArray {
+    divide(other: NDArray<T> | number): NDArray<T> {
         // Use optimized kernel for scalar operations
         if (typeof other === 'number') {
             if (other === 0) {
@@ -1271,7 +1194,7 @@ export class NDArray {
      * const a = new NDArray([2, 3, 4], [3]);
      * const result = a.power(2).subtract(1); // [3, 8, 15] - chained operations
      */
-    power(other: NDArray | number): NDArray {
+    power(other: NDArray<T> | number): NDArray<T> {
         // Use optimized kernel for scalar operations
         if (typeof other === 'number') {
             return this._applyScalarOperation(other, (a, b) => Math.pow(a, b), 'power');
@@ -1339,14 +1262,14 @@ export class NDArray {
      * const a = new NDArray([7, 8, 9], [3]);
      * const result = a.mod(3); // [1, 2, 0]
      */
-    mod(other: NDArray | number): NDArray {
+    mod(other: NDArray<T> | number): NDArray<T> {
         return this._broadcastBinaryOp(other, (a, b) => {
             if (b === 0) {
                 throw new Error('Modulo by zero');
             }
             return a % b;
         }, 'mod');
-    }
+}
 
     // ============================================================================
     // Axis-wise Operations
@@ -1363,12 +1286,12 @@ export class NDArray {
      * a.sum(0) // NDArray([4, 6]) (column sums)
      * a.sum(1) // NDArray([3, 7]) (row sums)
      */
-    sum(axis?: number | null): NDArray | number {
+    sum(axis?: number | null): NDArray<T> | number {
         if (axis === undefined || axis === null) {
             // Sum all elements
             let total = 0;
-            for (let i = 0; i < this._data.length; i++) {
-                total += this._data[i + this._offset]!;
+            for (let i = 0; i < this.data.length; i++) {
+                total += this.data[i + this.offset]!;
             }
             return total;
         }
@@ -1387,7 +1310,7 @@ export class NDArray {
      * a.mean(0) // NDArray([2, 3]) (column means)
      * a.mean(1) // NDArray([1.5, 3.5]) (row means)
      */
-    mean(axis?: number | null): NDArray | number {
+    mean(axis?: number | null): NDArray<T> | number {
         if (axis === undefined || axis === null) {
             // Mean of all elements
             const total = this.sum() as number;
@@ -1395,15 +1318,15 @@ export class NDArray {
         }
 
         const sums = this.sum(axis) as NDArray;
-        const counts = this._shape[axis]!;
+        const counts = this.shape[axis]!;
         
         // Create result array with means
-        const resultData = new (this._data.constructor as any)(sums.size);
+        const resultData = new (DTYPE_CONSTRUCTORS[this.dtype])(sums.size);
         for (let i = 0; i < sums.size; i++) {
-            resultData[i] = sums._data[i + sums._offset]! / counts;
+            resultData[i] = sums.data[i + sums.offset]! / counts;
         }
 
-        return new NDArray(resultData, sums.shape, { dtype: this._dtype });
+        return new NDArray(resultData, sums.shape, this.dtype);
     }
 
     /**
@@ -1418,17 +1341,17 @@ export class NDArray {
      * a.std(0) // NDArray([1, 1]) (column stds)
      * a.std(1) // NDArray([0.5, 0.5]) (row stds)
      */
-    std(axis?: number | null, ddof: number = 0): NDArray | number {
+    std(axis?: number | null, ddof: number = 0): NDArray<T> | number {
         const variance = this.var(axis, ddof);
         
         if (typeof variance === 'number') {
             return Math.sqrt(variance);
         } else {
-            const resultData = new (this._data.constructor as any)(variance.size);
+            const resultData = new (DTYPE_CONSTRUCTORS[this.dtype])(variance.size);
             for (let i = 0; i < variance.size; i++) {
-                resultData[i] = Math.sqrt(variance._data[i + variance._offset]!);
+                resultData[i] = Math.sqrt(variance.data[i + variance.offset]!);
             }
-            return new NDArray(resultData, variance.shape, { dtype: this._dtype });
+            return new NDArray(resultData, variance.shape, this.dtype);
         }
     }
 
@@ -1444,14 +1367,14 @@ export class NDArray {
      * a.var(0) // NDArray([1, 1]) (column variances)
      * a.var(1) // NDArray([0.25, 0.25]) (row variances)
      */
-    var(axis?: number | null, ddof: number = 0): NDArray | number {
+    var(axis?: number | null, ddof: number = 0): NDArray<T> | number {
         if (axis === undefined || axis === null) {
             // Variance of all elements
             const meanValue = this.mean() as number;
             let sumSquaredDiffs = 0;
             
-            for (let i = 0; i < this._data.length; i++) {
-                const diff = this._data[i + this._offset]! - meanValue;
+            for (let i = 0; i < this.data.length; i++) {
+                const diff = this.data[i + this.offset]! - meanValue;
                 sumSquaredDiffs += diff * diff;
             }
             
@@ -1464,14 +1387,14 @@ export class NDArray {
         }
 
         const means = this.mean(axis) as NDArray;
-        const n = this._shape[axis]!;
+        const n = this.shape[axis]!;
         
         if (n <= ddof) {
             throw new InvalidParameterError('ddof', `less than axis size (${n})`, ddof);
         }
 
         // Calculate variance along axis
-        const resultShape = [...this._shape];
+        const resultShape = [...this.shape];
         resultShape.splice(axis, 1);
         
         if (resultShape.length === 0) {
@@ -1479,7 +1402,7 @@ export class NDArray {
         }
         
         const resultSize = resultShape.reduce((a, b) => a * b, 1);
-        const resultData = new (this._data.constructor as any)(resultSize);
+        const resultData = new (DTYPE_CONSTRUCTORS[this.dtype])(resultSize);
         
         // Iterate through result positions
         for (let resultIdx = 0; resultIdx < resultSize; resultIdx++) {
@@ -1489,7 +1412,7 @@ export class NDArray {
             let sumSquaredDiffs = 0;
             
             // Sum squared differences along the specified axis
-            for (let axisIdx = 0; axisIdx < this._shape[axis]!; axisIdx++) {
+            for (let axisIdx = 0; axisIdx < this.shape[axis]!; axisIdx++) {
                 const indices = [...resultIndices];
                 indices.splice(axis, 0, axisIdx);
                 
@@ -1501,7 +1424,7 @@ export class NDArray {
             resultData[resultIdx] = sumSquaredDiffs / (n - ddof);
         }
 
-        return new NDArray(resultData, resultShape, { dtype: this._dtype });
+        return new NDArray(resultData, resultShape, this.dtype);
     }
 
     /**
@@ -1515,12 +1438,12 @@ export class NDArray {
      * a.min(0) // NDArray([1, 2]) (column mins)
      * a.min(1) // NDArray([1, 3]) (row mins)
      */
-    min(axis?: number | null): NDArray | number {
+    min(axis?: number | null): NDArray<T> | number {
         if (axis === undefined || axis === null) {
             // Min of all elements
             let minValue = Infinity;
-            for (let i = 0; i < this._data.length; i++) {
-                const value = this._data[i + this._offset]!;
+            for (let i = 0; i < this.data.length; i++) {
+                const value = this.data[i + this.offset]!;
                 if (value < minValue) {
                     minValue = value;
                 }
@@ -1542,12 +1465,12 @@ export class NDArray {
      * a.max(0) // NDArray([3, 4]) (column maxs)
      * a.max(1) // NDArray([2, 4]) (row maxs)
      */
-    max(axis?: number | null): NDArray | number {
+    max(axis?: number | null): NDArray<T> | number {
         if (axis === undefined || axis === null) {
             // Max of all elements
             let maxValue = -Infinity;
-            for (let i = 0; i < this._data.length; i++) {
-                const value = this._data[i + this._offset]!;
+            for (let i = 0; i < this.data.length; i++) {
+                const value = this.data[i + this.offset]!;
                 if (value > maxValue) {
                     maxValue = value;
                 }
@@ -1569,14 +1492,14 @@ export class NDArray {
      * @param initialValue - Initial value for the accumulator
      * @returns NDArray with reduced values
      */
-    private _reduceAlongAxis(axis: number, reduceFn: (acc: number, val: number) => number, initialValue: number): NDArray {
+    private _reduceAlongAxis(axis: number, reduceFn: (acc: number, val: number) => number, initialValue: number): NDArray<T> {
         // Validate axis
         if (!Number.isInteger(axis) || axis < 0 || axis >= this.ndim) {
             throw new InvalidParameterError('axis', `integer between 0 and ${this.ndim - 1}`, axis);
         }
 
         // Calculate result shape (remove the reduced axis)
-        const resultShape = [...this._shape];
+        const resultShape = [...this.shape];
         resultShape.splice(axis, 1);
         
         if (resultShape.length === 0) {
@@ -1584,7 +1507,7 @@ export class NDArray {
         }
         
         const resultSize = resultShape.reduce((a, b) => a * b, 1);
-        const resultData = new (this._data.constructor as any)(resultSize);
+        const resultData = new (this.data.constructor as any)(resultSize);
         
         // Iterate through result positions
         for (let resultIdx = 0; resultIdx < resultSize; resultIdx++) {
@@ -1593,7 +1516,7 @@ export class NDArray {
             let accumulator = initialValue;
             
             // Reduce along the specified axis
-            for (let axisIdx = 0; axisIdx < this._shape[axis]!; axisIdx++) {
+            for (let axisIdx = 0; axisIdx < this.shape[axis]!; axisIdx++) {
                 const indices = [...resultIndices];
                 indices.splice(axis, 0, axisIdx);
                 
@@ -1604,7 +1527,7 @@ export class NDArray {
             resultData[resultIdx] = accumulator;
         }
 
-        return new NDArray(resultData, resultShape, { dtype: this._dtype });
+        return new NDArray(resultData, resultShape, this.dtype);
     }
 
 
@@ -1654,15 +1577,15 @@ export class NDArray {
     /**
      * Create a copy of this NDArray
      */
-    clone(): NDArray {
-        return new NDArray(Array.from(this._data), this._shape, { dtype: this._dtype });
+    clone(): NDArray<T> {
+        return new NDArray(Array.from(this.data), this.shape, this.dtype);
     }
 
     /**
      * String representation of the array
      */
     toString(): string {
-        return `NDArray(shape=[${this._shape.join(', ')}], dtype=${this._dtype})`;
+        return `NDArray(shape=[${this.shape.join(', ')}], dtype=${this.dtype})`;
     }
 
     /**
@@ -1670,6 +1593,9 @@ export class NDArray {
      */
     repr(): string {
         // For now, just return basic info - we'll enhance this later
-        return `NDArray(shape=[${this._shape.join(', ')}], dtype=${this._dtype}, size=${this.size})`;
+        return `NDArray(shape=[${this.shape.join(', ')}], dtype=${this.dtype}, size=${this.size})`;
     }
 }
+
+// Re-export types for external use
+export type { DType };

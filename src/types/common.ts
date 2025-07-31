@@ -42,6 +42,80 @@ export interface Dimensions {
     readonly size: number;
 }
 
+
+// ============================================================================
+// Data Type (dtype) System
+// ============================================================================
+
+/**
+ * Supported data types for NDArray.
+ */
+export type DType =
+  | 'float64'
+  | 'float32'
+  | 'int32'
+  | 'int16'
+  | 'int8'
+  | 'uint32'
+  | 'uint16'
+  | 'uint8'
+  | 'uint8c' // Clamped
+  | 'bool'; // Represented by Uint8Array
+
+/**
+ * Union of all supported TypedArray types.
+ */
+export type TypedArray =
+  | Float64Array
+  | Float32Array
+  | Int32Array
+  | Int16Array
+  | Int8Array
+  | Uint32Array
+  | Uint16Array
+  | Uint8Array
+  | Uint8ClampedArray;
+
+/**
+ * Maps a DType string to its corresponding TypedArray instance type.
+ * This is crucial for generic type safety.
+ */
+export interface DTypeMap {
+  float64: Float64Array;
+  float32: Float32Array;
+  int32: Int32Array;
+  int16: Int16Array;
+  int8: Int8Array;
+  uint32: Uint32Array;
+  uint16: Uint16Array;
+  uint8: Uint8Array;
+  uint8c: Uint8ClampedArray;
+  bool: Uint8Array;
+}
+
+/**
+ * Represents a constructor for a TypedArray.
+ */
+export type TypedArrayConstructor<T extends TypedArray> = new (
+  bufferOrLength?: number | ArrayBufferLike
+) => T;
+
+/**
+ * Runtime mapping from DType string to TypedArray constructor.
+ */
+export const DTYPE_CONSTRUCTORS: { [K in DType]: TypedArrayConstructor<DTypeMap[K]> } = {
+  float64: Float64Array,
+  float32: Float32Array,
+  int32: Int32Array,
+  int16: Int16Array,
+  int8: Int8Array,
+  uint32: Uint32Array,
+  uint16: Uint16Array,
+  uint8: Uint8Array,
+  uint8c: Uint8ClampedArray,
+  bool: Uint8Array,
+};
+
 // ============================================================================
 // Statistical Function Options
 // ============================================================================

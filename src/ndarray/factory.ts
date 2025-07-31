@@ -3,7 +3,8 @@
  * Provides NumPy-like array creation functions
  */
 
-import { NDArray, type DType, type NDArrayOptions } from './ndarray.js';
+import { NDArray, type NDArrayOptions } from './ndarray.js';
+import { DTypeMap,  type DType, } from '../types/common.js';
 import type { Shape } from '../types/common.js';
 import { InvalidParameterError, DimensionError } from '../types/errors.js';
 import { validateShape, validateFiniteNumber } from '../types/validation.js';
@@ -20,21 +21,22 @@ import { validateShape, validateFiniteNumber } from '../types/validation.js';
  * 
  * @example
  * ```typescript
- * const arr = zeros([2, 3]); // 2x3 array of zeros
+ * const arr = zeros([2, 3]); // 2x3 array of zeros (float64)
  * const arr2 = zeros([5], { dtype: 'int32' }); // 1D array of 5 zeros as int32
+ * const arr3 = zeros<'float32'>([3, 3], { dtype: 'float32' }); // Type-safe float32 array
  * ```
  */
-export function zeros(shape: Shape, options: NDArrayOptions = {}): NDArray {
+export function zeros<T extends DType = 'float64'>(shape: Shape, options: NDArrayOptions<T> = {}): NDArray<T> {
     validateShape(shape);
     
-    const { dtype = 'float64' } = options;
+    const { dtype = 'float64' as T } = options;
     const size = shape.reduce((acc, dim) => acc * dim, 1);
     
     // Create a typed array filled with zeros
     const data = createTypedArray(dtype, size);
     data.fill(0);
     
-    return new NDArray(data, shape, options);
+    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
 }
 
 /**
@@ -49,17 +51,17 @@ export function zeros(shape: Shape, options: NDArrayOptions = {}): NDArray {
  * const arr2 = ones([4], { dtype: 'float32' }); // 1D array of 4 ones as float32
  * ```
  */
-export function ones(shape: Shape, options: NDArrayOptions = {}): NDArray {
+export function ones<T extends DType = 'float64'>(shape: Shape, options: NDArrayOptions<T> = {}): NDArray<T> {
     validateShape(shape);
     
-    const { dtype = 'float64' } = options;
+    const { dtype = 'float64' as T } = options;
     const size = shape.reduce((acc, dim) => acc * dim, 1);
     
     // Create a typed array filled with ones
     const data = createTypedArray(dtype, size);
     data.fill(1);
     
-    return new NDArray(data, shape, options);
+    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
 }
 
 /**
@@ -75,18 +77,18 @@ export function ones(shape: Shape, options: NDArrayOptions = {}): NDArray {
  * const arr2 = full([3], -1.5, { dtype: 'float32' }); // 1D array filled with -1.5
  * ```
  */
-export function full(shape: Shape, fillValue: number, options: NDArrayOptions = {}): NDArray {
+export function full<T extends DType = 'float64'>(shape: Shape, fillValue: number, options: NDArrayOptions<T> = {}): NDArray<T> {
     validateShape(shape);
     validateFiniteNumber(fillValue, 'fillValue');
     
-    const { dtype = 'float64' } = options;
+    const { dtype = 'float64' as T } = options;
     const size = shape.reduce((acc, dim) => acc * dim, 1);
     
     // Create a typed array filled with the specified value
     const data = createTypedArray(dtype, size);
     data.fill(fillValue);
     
-    return new NDArray(data, shape, options);
+    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
 }
 
 /**
@@ -101,12 +103,12 @@ export function full(shape: Shape, fillValue: number, options: NDArrayOptions = 
  * const I2 = eye(4, { dtype: 'int32' }); // 4x4 identity matrix as int32
  * ```
  */
-export function eye(n: number, options: NDArrayOptions = {}): NDArray {
+export function eye<T extends DType = 'float64'>(n: number, options: NDArrayOptions<T> = {}): NDArray<T> {
     if (!Number.isInteger(n) || n <= 0) {
         throw new InvalidParameterError('n', 'positive integer', n);
     }
     
-    const { dtype = 'float64' } = options;
+    const { dtype = 'float64' as T } = options;
     const shape: Shape = [n, n];
     const size = n * n;
     
@@ -119,7 +121,7 @@ export function eye(n: number, options: NDArrayOptions = {}): NDArray {
         data[i * n + i] = 1;
     }
     
-    return new NDArray(data, shape, options);
+    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
 }
 
 // ============================================================================
@@ -141,7 +143,7 @@ export function eye(n: number, options: NDArrayOptions = {}): NDArray {
  * const arr3 = arange(1, 5, 0.5); // [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5]
  * ```
  */
-export function arange(start: number, stop?: number, step: number = 1, options: NDArrayOptions = {}): NDArray {
+export function arange<T extends DType = 'float64'>(start: number, stop?: number, step: number = 1, options: NDArrayOptions<T> = {}): NDArray<T> {
     // Handle single argument case: arange(stop)
     if (stop === undefined) {
         stop = start;
@@ -161,10 +163,10 @@ export function arange(start: number, stop?: number, step: number = 1, options: 
     
     if (numElements === 0) {
         // Create an empty array with shape [0] - this is valid for empty sequences
-        const { dtype = 'float64' } = options;
+        const { dtype = 'float64' as T } = options;
         const data = createTypedArray(dtype, 0);
         // Use a minimal NDArray constructor approach for empty arrays
-        const emptyArray = Object.create(NDArray.prototype) as NDArray;
+        const emptyArray = Object.create(NDArray.prototype) as NDArray<T>;
         (emptyArray as any)._data = data;
         (emptyArray as any)._shape = [0];
         (emptyArray as any)._strides = [1];
@@ -174,7 +176,7 @@ export function arange(start: number, stop?: number, step: number = 1, options: 
         return emptyArray;
     }
     
-    const { dtype = 'float64' } = options;
+    const { dtype = 'float64' as T } = options;
     const data = createTypedArray(dtype, numElements);
     
     // Fill the array with the sequence
@@ -182,7 +184,7 @@ export function arange(start: number, stop?: number, step: number = 1, options: 
         data[i] = start + i * step;
     }
     
-    return new NDArray(data, [numElements], options);
+    return new NDArray<T>(Array.from(data), [numElements], dtype, 0, undefined, false);
 }
 
 /**
@@ -200,7 +202,7 @@ export function arange(start: number, stop?: number, step: number = 1, options: 
  * const arr3 = linspace(0, 10, 11); // [0, 1, 2, ..., 10]
  * ```
  */
-export function linspace(start: number, stop: number, num: number = 50, options: NDArrayOptions = {}): NDArray {
+export function linspace<T extends DType = 'float64'>(start: number, stop: number, num: number = 50, options: NDArrayOptions<T> = {}): NDArray<T> {
     validateFiniteNumber(start, 'start');
     validateFiniteNumber(stop, 'stop');
     
@@ -208,7 +210,7 @@ export function linspace(start: number, stop: number, num: number = 50, options:
         throw new InvalidParameterError('num', 'positive integer', num);
     }
     
-    const { dtype = 'float64' } = options;
+    const { dtype = 'float64' as T } = options;
     const data = createTypedArray(dtype, num);
     
     if (num === 1) {
@@ -227,7 +229,7 @@ export function linspace(start: number, stop: number, num: number = 50, options:
         data[num - 1] = stop;
     }
     
-    return new NDArray(data, [num], options);
+    return new NDArray<T>(Array.from(data), [num], dtype, 0, undefined, false);
 }
 
 // ============================================================================
@@ -247,7 +249,7 @@ export function linspace(start: number, stop: number, num: number = 50, options:
  * const arr3 = fromArray([[[1, 2], [3, 4]], [[5, 6], [7, 8]]]); // 2x2x2 array
  * ```
  */
-export function fromArray(array: number | number[] | number[][] | number[][][], options: NDArrayOptions = {}): NDArray {
+export function fromArray<T extends DType = 'float64'>(array: number | number[] | number[][] | number[][][], options: NDArrayOptions<T> = {}): NDArray<T> {
     // Handle scalar case
     if (typeof array === 'number') {
         return createScalarNDArray(array, options);
@@ -257,7 +259,8 @@ export function fromArray(array: number | number[] | number[][] | number[][][], 
     const shape = inferShape(array);
     
     // Create the NDArray using the existing constructor
-    return new NDArray(array, shape, options);
+    const { dtype = 'float64' as T, readonly = false } = options;
+    return new NDArray<T>(array, shape, dtype, 0, undefined, readonly);
 }
 
 // ============================================================================
@@ -335,23 +338,14 @@ function inferShape(array: number | number[] | number[][] | number[][][]): Shape
 /**
  * Create a scalar NDArray (0-dimensional)
  */
-function createScalarNDArray(value: number, options: NDArrayOptions = {}): NDArray {
-    const { dtype = 'float64', readonly = false } = options;
+function createScalarNDArray<T extends DType = 'float64'>(value: number, options: NDArrayOptions<T> = {}): NDArray<T> {
+    const { dtype = 'float64' as T, readonly = false } = options;
     
-    // Create a single-element typed array
-    const data = createTypedArray(dtype, 1);
-    data[0] = value;
+    // Create a single-element array for the NDArray constructor
+    const data = [value];
     
     // Create NDArray with empty shape (scalar)
-    const scalar = Object.create(NDArray.prototype) as NDArray;
-    (scalar as any)._data = data;
-    (scalar as any)._shape = [];
-    (scalar as any)._strides = [];
-    (scalar as any)._dtype = dtype;
-    (scalar as any)._readonly = readonly;
-    (scalar as any)._offset = 0;
-    
-    return scalar;
+    return new NDArray<T>(data, [], dtype, 0, undefined, readonly);
 }
 /**
 
@@ -366,10 +360,10 @@ function createScalarNDArray(value: number, options: NDArrayOptions = {}): NDArr
  * const arr2 = random([5], { dtype: 'float32' }); // 1D array of 5 random values as float32
  * ```
  */
-export function random(shape: Shape, options: NDArrayOptions = {}): NDArray {
+export function random<T extends DType = 'float64'>(shape: Shape, options: NDArrayOptions<T> = {}): NDArray<T> {
     validateShape(shape);
     
-    const { dtype = 'float64' } = options;
+    const { dtype = 'float64' as T } = options;
     const size = shape.reduce((acc, dim) => acc * dim, 1);
     
     // Create a typed array filled with random values
@@ -378,5 +372,5 @@ export function random(shape: Shape, options: NDArrayOptions = {}): NDArray {
         data[i] = Math.random();
     }
     
-    return new NDArray(data, shape, options);
+    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
 }

@@ -3,7 +3,7 @@
  * Provides element-wise operations that work on both scalars and NDArrays
  */
 
-import type { NumericArray } from '../types/common.js';
+import type { NumericArray, DType } from '../types/common.js';
 import { NDArray } from '../ndarray/ndarray.js';
 import { 
   InvalidParameterError, 
@@ -25,15 +25,15 @@ export type UnaryScalarFunction = (x: number) => number;
 /** Function that operates on two numbers */
 export type BinaryScalarFunction = (x: number, y: number) => number;
 
-/** Universal function that can operate on scalars or NDArrays */
+/** Universal function that can operate on scalars or NDArrays with type preservation */
 export type UniversalFunction<T extends UnaryScalarFunction | BinaryScalarFunction> = 
   T extends UnaryScalarFunction 
-    ? ((x: number) => number) & ((x: NDArray) => NDArray)
+    ? ((x: number) => number) & (<U extends DType>(x: NDArray<U>) => NDArray<U>)
     : T extends BinaryScalarFunction
     ? ((x: number, y: number) => number) & 
-      ((x: NDArray, y: number) => NDArray) & 
-      ((x: number, y: NDArray) => NDArray) & 
-      ((x: NDArray, y: NDArray) => NDArray)
+      (<U extends DType>(x: NDArray<U>, y: number) => NDArray<U>) & 
+      (<U extends DType>(x: number, y: NDArray<U>) => NDArray<U>) & 
+      (<U extends DType, V extends DType>(x: NDArray<U>, y: NDArray<V>) => NDArray<U>)
     : never;
 
 // ============================================================================
@@ -75,15 +75,15 @@ export function createUnaryUfunc(
  * Optimized kernel for unary operations on NDArrays
  * Uses stride-based iteration for maximum performance
  */
-function applyUnaryKernel(arr: NDArray, fn: UnaryScalarFunction, name: string): NDArray {
+function applyUnaryKernel<T extends DType>(arr: NDArray<T>, fn: UnaryScalarFunction, name: string): NDArray<T> {
   const size = arr.size;
-  const resultData = new (arr as any)._data.constructor(size);
-  const sourceData = (arr as any)._data;
-  const offset = (arr as any)._offset;
+  const resultData = new (arr.data.constructor as any)(size);
+  const sourceData = arr.data;
+  const offset = arr.offset;
   
   // Optimized loop - JIT compiler can optimize simple for loops better
   for (let i = 0; i < size; i++) {
-    const value = sourceData[offset + i];
+    const value = sourceData[offset + i]!;
     try {
       resultData[i] = fn(value);
     } catch (error) {
@@ -91,7 +91,12 @@ function applyUnaryKernel(arr: NDArray, fn: UnaryScalarFunction, name: string): 
     }
   }
   
-  return new NDArray(resultData, arr.shape, { dtype: arr.dtype });
+  // Convert TypedArray to regular array for NDArray constructor
+  const resultArray: number[] = [];
+  for (let i = 0; i < size; i++) {
+    resultArray[i] = resultData[i];
+  }
+  return new NDArray<T>(resultArray, arr.shape, arr.dtype, 0, undefined, false);
 }
 
 /**
@@ -143,20 +148,20 @@ export function createBinaryUfunc(
  * Optimized kernel for binary operations between NDArray and scalar
  * Avoids creating temporary arrays and uses direct iteration
  */
-function applyBinaryScalarKernel(
-  arr: NDArray, 
+function applyBinaryScalarKernel<T extends DType>(
+  arr: NDArray<T>, 
   scalar: number, 
   fn: BinaryScalarFunction, 
   name: string
-): NDArray {
+): NDArray<T> {
   const size = arr.size;
-  const resultData = new (arr as any)._data.constructor(size);
-  const sourceData = (arr as any)._data;
-  const offset = (arr as any)._offset;
+  const resultData = new (arr.data.constructor as any)(size);
+  const sourceData = arr.data;
+  const offset = arr.offset;
   
   // Optimized loop for scalar operations
   for (let i = 0; i < size; i++) {
-    const value = sourceData[offset + i];
+    const value = sourceData[offset + i]!;
     try {
       resultData[i] = fn(value, scalar);
     } catch (error) {
@@ -164,7 +169,12 @@ function applyBinaryScalarKernel(
     }
   }
   
-  return new NDArray(resultData, arr.shape, { dtype: arr.dtype });
+  // Convert TypedArray to regular array for NDArray constructor
+  const resultArray: number[] = [];
+  for (let i = 0; i < size; i++) {
+    resultArray[i] = resultData[i];
+  }
+  return new NDArray<T>(resultArray, arr.shape, arr.dtype, 0, undefined, false);
 }
 
 // ============================================================================
@@ -525,15 +535,20 @@ export function all(arr: NDArray, axis?: number): boolean | NDArray {
  * @param arr - Input NDArray with numeric values (0 = false, non-zero = true)
  * @returns New NDArray with boolean interpretation
  */
-export function toBooleanArray(arr: NDArray): NDArray {
-  const resultData = new (arr as any)._data.constructor(arr.size);
+export function toBooleanArray<T extends DType>(arr: NDArray<T>): NDArray<T> {
+  const resultData = new (arr.data.constructor as any)(arr.size);
   
   for (let i = 0; i < arr.size; i++) {
-    const value = (arr as any)._data[(arr as any)._offset + i];
+    const value = arr.data[arr.offset + i]!;
     resultData[i] = value !== 0 ? 1 : 0;
   }
   
-  return new NDArray(resultData, arr.shape, { dtype: arr.dtype });
+  // Convert TypedArray to regular array for NDArray constructor
+  const resultArray: number[] = [];
+  for (let i = 0; i < arr.size; i++) {
+    resultArray[i] = resultData[i];
+  }
+  return new NDArray<T>(resultArray, arr.shape, arr.dtype, 0, undefined, false);
 }
 
 /**
@@ -579,12 +594,12 @@ export function nonzero(arr: NDArray): number[][] {
  * @param y - Values to select when condition is false
  * @returns NDArray with selected values
  */
-export function where(condition: NDArray, x: NDArray | number, y: NDArray | number): NDArray {
+export function where<T extends DType>(condition: NDArray<T>, x: NDArray<T> | number, y: NDArray<T> | number): NDArray<T> {
   // For simplicity, implement basic case where condition determines the shape
-  const resultData = new (condition as any)._data.constructor(condition.size);
+  const resultData = new (condition.data.constructor as any)(condition.size);
   
   for (let i = 0; i < condition.size; i++) {
-    const condValue = (condition as any)._data[(condition as any)._offset + i];
+    const condValue = condition.data[condition.offset + i]!;
     
     let xValue: number;
     let yValue: number;
@@ -593,20 +608,25 @@ export function where(condition: NDArray, x: NDArray | number, y: NDArray | numb
       xValue = x;
     } else {
       // For simplicity, assume same shape - in full implementation would need broadcasting
-      xValue = (x as any)._data[(x as any)._offset + i];
+      xValue = x.data[x.offset + i]!;
     }
     
     if (typeof y === 'number') {
       yValue = y;
     } else {
       // For simplicity, assume same shape - in full implementation would need broadcasting
-      yValue = (y as any)._data[(y as any)._offset + i];
+      yValue = y.data[y.offset + i]!;
     }
     
     resultData[i] = condValue !== 0 ? xValue : yValue;
   }
   
-  return new NDArray(resultData, condition.shape, { dtype: condition.dtype });
+  // Convert TypedArray to regular array for NDArray constructor
+  const resultArray: number[] = [];
+  for (let i = 0; i < condition.size; i++) {
+    resultArray[i] = resultData[i];
+  }
+  return new NDArray<T>(resultArray, condition.shape, condition.dtype, 0, undefined, false);
 }
 
 // Mark all exported ufuncs
@@ -723,47 +743,57 @@ export function minimumKernel(a: NDArray, b: NDArray | number): NDArray {
  * Fused multiply-add kernel: (a * b) + c
  * Avoids creating intermediate array for a * b
  */
-export function multiplyAddKernel(a: NDArray, b: NDArray | number, c: NDArray | number): NDArray {
+export function multiplyAddKernel<T extends DType>(a: NDArray<T>, b: NDArray<T> | number, c: NDArray<T> | number): NDArray<T> {
   const size = a.size;
-  const resultData = new (a as any)._data.constructor(size);
-  const aData = (a as any)._data;
-  const aOffset = (a as any)._offset;
+  const resultData = new (a.data.constructor as any)(size);
+  const aData = a.data;
+  const aOffset = a.offset;
   
   if (typeof b === 'number' && typeof c === 'number') {
     // Optimized case: a * scalar + scalar
     for (let i = 0; i < size; i++) {
-      resultData[i] = aData[aOffset + i] * b + c;
+      resultData[i] = aData[aOffset + i]! * b + c;
     }
   } else {
     // For more complex cases, fall back to separate operations
     // This is where future loop fusion optimization would go
-    const temp = multiplyKernel(a, b);
-    return addKernel(temp, c);
+    const temp = multiply(a, b as any) as NDArray<T>;
+    return add(temp, c as any) as NDArray<T>;
   }
   
-  return new NDArray(resultData, a.shape, { dtype: a.dtype });
+  // Convert TypedArray to regular array for NDArray constructor
+  const resultArray: number[] = [];
+  for (let i = 0; i < size; i++) {
+    resultArray[i] = resultData[i];
+  }
+  return new NDArray<T>(resultArray, a.shape, a.dtype, 0, undefined, false);
 }
 
 /**
  * Fused add-multiply kernel: (a + b) * c
  * Avoids creating intermediate array for a + b
  */
-export function addMultiplyKernel(a: NDArray, b: NDArray | number, c: NDArray | number): NDArray {
+export function addMultiplyKernel<T extends DType>(a: NDArray<T>, b: NDArray<T> | number, c: NDArray<T> | number): NDArray<T> {
   const size = a.size;
-  const resultData = new (a as any)._data.constructor(size);
-  const aData = (a as any)._data;
-  const aOffset = (a as any)._offset;
+  const resultData = new (a.data.constructor as any)(size);
+  const aData = a.data;
+  const aOffset = a.offset;
   
   if (typeof b === 'number' && typeof c === 'number') {
     // Optimized case: (a + scalar) * scalar
     for (let i = 0; i < size; i++) {
-      resultData[i] = (aData[aOffset + i] + b) * c;
+      resultData[i] = (aData[aOffset + i]! + b) * c;
     }
   } else {
     // For more complex cases, fall back to separate operations
-    const temp = addKernel(a, b);
-    return multiplyKernel(temp, c);
+    const temp = add(a, b as any) as NDArray<T>;
+    return multiply(temp, c as any) as NDArray<T>;
   }
   
-  return new NDArray(resultData, a.shape, { dtype: a.dtype });
+  // Convert TypedArray to regular array for NDArray constructor
+  const resultArray: number[] = [];
+  for (let i = 0; i < size; i++) {
+    resultArray[i] = resultData[i];
+  }
+  return new NDArray<T>(resultArray, a.shape, a.dtype, 0, undefined, false);
 }
