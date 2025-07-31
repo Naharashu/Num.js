@@ -3,7 +3,7 @@
  * Provides NumPy-like array creation functions
  */
 
-import { NDArray, type NDArrayOptions } from './ndarray.js';
+import { NDArray, type NDArrayOptions, calculateStrides } from './ndarray.js';
 import { DTypeMap,  type DType, } from '../types/common.js';
 import type { Shape } from '../types/common.js';
 import { InvalidParameterError, DimensionError } from '../types/errors.js';
@@ -36,7 +36,7 @@ export function zeros<T extends DType = 'float64'>(shape: Shape, options: NDArra
     const data = createTypedArray(dtype, size);
     data.fill(0);
     
-    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
+    return new NDArray<T>(Array.from(data), shape, dtype);
 }
 
 /**
@@ -61,7 +61,7 @@ export function ones<T extends DType = 'float64'>(shape: Shape, options: NDArray
     const data = createTypedArray(dtype, size);
     data.fill(1);
     
-    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
+    return new NDArray<T>(Array.from(data), shape, dtype);
 }
 
 /**
@@ -88,7 +88,7 @@ export function full<T extends DType = 'float64'>(shape: Shape, fillValue: numbe
     const data = createTypedArray(dtype, size);
     data.fill(fillValue);
     
-    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
+    return new NDArray<T>(Array.from(data), shape, dtype);
 }
 
 /**
@@ -121,7 +121,7 @@ export function eye<T extends DType = 'float64'>(n: number, options: NDArrayOpti
         data[i * n + i] = 1;
     }
     
-    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
+    return new NDArray<T>(Array.from(data), shape, dtype);
 }
 
 // ============================================================================
@@ -260,7 +260,7 @@ export function fromArray<T extends DType = 'float64'>(array: number | number[] 
     
     // Create the NDArray using the existing constructor
     const { dtype = 'float64' as T, readonly = false } = options;
-    return new NDArray<T>(array, shape, dtype, 0, undefined, readonly);
+    return new NDArray<T>(array, shape, dtype, 0, calculateStrides(shape), readonly);
 }
 
 // ============================================================================
@@ -345,7 +345,7 @@ function createScalarNDArray<T extends DType = 'float64'>(value: number, options
     const data = [value];
     
     // Create NDArray with empty shape (scalar)
-    return new NDArray<T>(data, [], dtype, 0, undefined, readonly);
+    return new NDArray<T>(data, [], dtype, 0, calculateStrides([]), readonly);
 }
 /**
 
@@ -372,5 +372,5 @@ export function random<T extends DType = 'float64'>(shape: Shape, options: NDArr
         data[i] = Math.random();
     }
     
-    return new NDArray<T>(Array.from(data), shape, dtype, 0, undefined, false);
+    return new NDArray<T>(Array.from(data), shape, dtype);
 }

@@ -54,7 +54,8 @@ function validate2DNDArray(matrix: NDArray, operation: string): void {
  * LU decomposition with partial pivoting for NDArray
  */
 function luDecomposition(matrix: NDArray): { L: NDArray; U: NDArray; P: number[] } {
-  const n = matrix.shape[0]!;
+  validateSquareNDArray(matrix, 'LU decomposition');
+  const n = matrix.shape[0] as number; // Safe after validation
   const L = fromArray(Array.from({ length: n }, (_, i) => 
     Array.from({ length: n }, (_, j) => i === j ? 1 : 0)
   ));
@@ -116,7 +117,9 @@ function luDecomposition(matrix: NDArray): { L: NDArray; U: NDArray; P: number[]
  * Gauss-Jordan elimination for matrix inverse
  */
 function gaussJordanInverse(matrix: NDArray): NDArray {
-  const n = matrix.shape[0]!;
+  validateSquareNDArray(matrix, 'matrix inverse');
+  
+  const n = matrix.shape[0] as number; // Safe after validation
   const augmented: number[][] = [];
   
   // Create augmented matrix [A | I]
@@ -188,9 +191,10 @@ function gaussJordanInverse(matrix: NDArray): NDArray {
  * Reduced row echelon form for rank calculation
  */
 function reducedRowEchelonForm(matrix: NDArray): NDArray {
+  validate2DNDArray(matrix, 'reduced row echelon form');
   const result = matrix.clone();
-  const rows = result.shape[0]!;
-  const cols = result.shape[1]!;
+  const rows = result.shape[0] as number; // Safe after validation
+  const cols = result.shape[1] as number; // Safe after validation
   
   let lead = 0;
   for (let r = 0; r < rows; r++) {
@@ -251,7 +255,7 @@ function reducedRowEchelonForm(matrix: NDArray): NDArray {
 export function det(matrix: NDArray): number {
   validateSquareNDArray(matrix, 'determinant');
   
-  const n = matrix.shape[0]!;
+  const n = matrix.shape[0] as number; // Safe after validation
   
   if (n === 1) {
     return matrix.get(0, 0);
@@ -305,7 +309,7 @@ export function inv(matrix: NDArray): NDArray {
     throw new SingularMatrixError(matrix.shape);
   }
   
-  const n = matrix.shape[0]!;
+  const n = matrix.shape[0] as number; // Safe after validation
   
   if (n === 1) {
     return fromArray([[1 / matrix.get(0, 0)]]);
@@ -347,20 +351,23 @@ export function rank(matrix: NDArray): number {
   validate2DNDArray(matrix, 'rank');
   
   const rref = reducedRowEchelonForm(matrix);
-  let matrixRank = 0;
+  let rank = 0;
   
-  for (let i = 0; i < rref.shape[0]!; i++) {
+  const rows = rref.shape[0] as number; // Safe after validation
+  const cols = rref.shape[1] as number; // Safe after validation
+  
+  for (let i = 0; i < rows; i++) {
     let hasNonZero = false;
-    for (let j = 0; j < rref.shape[1]!; j++) {
+    for (let j = 0; j < cols; j++) {
       if (Math.abs(rref.get(i, j)) > Number.EPSILON) {
         hasNonZero = true;
         break;
       }
     }
-    if (hasNonZero) matrixRank++;
+    if (hasNonZero) rank++;
   }
   
-  return matrixRank;
+  return rank;
 }
 
 // ============================================================================
@@ -380,7 +387,7 @@ export function trace(matrix: NDArray): number {
   validateSquareNDArray(matrix, 'trace');
   
   let traceValue = 0;
-  const size = matrix.shape[0]!;
+  const size = matrix.shape[0] as number; // Safe after validation
   for (let i = 0; i < size; i++) {
     traceValue += matrix.get(i, i);
   }
@@ -405,8 +412,8 @@ export function trace(matrix: NDArray): number {
 export function norm(matrix: NDArray, ord: 'fro' | number = 'fro'): number {
   validate2DNDArray(matrix, 'norm');
   
-  const rows = matrix.shape[0]!;
-  const cols = matrix.shape[1]!;
+  const rows = matrix.shape[0] as number; // Safe after validation
+  const cols = matrix.shape[1] as number; // Safe after validation
   
   if (ord === 'fro') {
     // Frobenius norm
@@ -467,7 +474,7 @@ export function norm(matrix: NDArray, ord: 'fro' | number = 'fro'): number {
 export function solve(A: NDArray, b: NumericArray): NumericArray {
   validateSquareNDArray(A, 'solve');
   
-  const rows = A.shape[0]!;
+  const rows = A.shape[0] as number; // Safe after validation
   if (b.length !== rows) {
     throw new DimensionError(
       'Vector b must have same length as matrix rows',
@@ -532,7 +539,7 @@ export function isPositiveDefinite(matrix: NDArray): boolean {
   
   try {
     // Try Cholesky decomposition - if it succeeds, matrix is positive definite
-    const n = matrix.shape[0]!;
+    const n = matrix.shape[0] as number; // Safe after validation
     
     for (let i = 0; i < n; i++) {
       for (let j = 0; j <= i; j++) {
@@ -573,8 +580,8 @@ export function isSymmetric(matrix: NDArray, tolerance: number = Number.EPSILON)
     return false; // Non-square matrices cannot be symmetric
   }
   
-  const rows = matrix.shape[0]!;
-  const cols = matrix.shape[1]!;
+  const rows = matrix.shape[0] as number; // Safe after validation
+  const cols = matrix.shape[1] as number; // Safe after validation
   for (let i = 0; i < rows; i++) {
     for (let j = 0; j < cols; j++) {
       const element1 = matrix.get(i, j);

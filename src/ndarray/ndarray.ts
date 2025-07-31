@@ -41,7 +41,7 @@ export interface NDArrayOptions<T extends DType> {
 /**
  * Calculate strides for a given shape (C-order/row-major)
  */
-function calculateStrides(shape: Shape): number[] {
+export function calculateStrides(shape: Shape): number[] {
     const strides = new Array<number>(shape.length);
     let stride = 1;
 
@@ -344,7 +344,7 @@ export class NDArray<T extends DType = 'float64'> {
             resultData[i] = this.data[offset]!;
         }
 
-        return new NDArray<T>(resultData, resultShape, this.dtype, 0, undefined, this.readonly);
+        return new NDArray<T>(resultData, resultShape, this.dtype, 0, calculateStrides(resultShape), this.readonly);
     }
 
     /**
@@ -1286,8 +1286,8 @@ export class NDArray<T extends DType = 'float64'> {
      * a.sum(0) // NDArray([4, 6]) (column sums)
      * a.sum(1) // NDArray([3, 7]) (row sums)
      */
-    sum(axis?: number | null): NDArray<T> | number {
-        if (axis === undefined || axis === null) {
+    sum(axis?: number): NDArray<T> | number {
+        if (axis === undefined) {
             // Sum all elements
             let total = 0;
             for (let i = 0; i < this.data.length; i++) {
@@ -1310,8 +1310,8 @@ export class NDArray<T extends DType = 'float64'> {
      * a.mean(0) // NDArray([2, 3]) (column means)
      * a.mean(1) // NDArray([1.5, 3.5]) (row means)
      */
-    mean(axis?: number | null): NDArray<T> | number {
-        if (axis === undefined || axis === null) {
+    mean(axis?: number): NDArray<T> | number {
+        if (axis === undefined) {
             // Mean of all elements
             const total = this.sum() as number;
             return total / this.size;
@@ -1341,7 +1341,7 @@ export class NDArray<T extends DType = 'float64'> {
      * a.std(0) // NDArray([1, 1]) (column stds)
      * a.std(1) // NDArray([0.5, 0.5]) (row stds)
      */
-    std(axis?: number | null, ddof: number = 0): NDArray<T> | number {
+    std(axis?: number, ddof: number = 0): NDArray<T> | number {
         const variance = this.var(axis, ddof);
         
         if (typeof variance === 'number') {
@@ -1367,8 +1367,8 @@ export class NDArray<T extends DType = 'float64'> {
      * a.var(0) // NDArray([1, 1]) (column variances)
      * a.var(1) // NDArray([0.25, 0.25]) (row variances)
      */
-    var(axis?: number | null, ddof: number = 0): NDArray<T> | number {
-        if (axis === undefined || axis === null) {
+    var(axis?: number, ddof: number = 0): NDArray<T> | number {
+        if (axis === undefined) {
             // Variance of all elements
             const meanValue = this.mean() as number;
             let sumSquaredDiffs = 0;
@@ -1438,8 +1438,8 @@ export class NDArray<T extends DType = 'float64'> {
      * a.min(0) // NDArray([1, 2]) (column mins)
      * a.min(1) // NDArray([1, 3]) (row mins)
      */
-    min(axis?: number | null): NDArray<T> | number {
-        if (axis === undefined || axis === null) {
+    min(axis?: number): NDArray<T> | number {
+        if (axis === undefined) {
             // Min of all elements
             let minValue = Infinity;
             for (let i = 0; i < this.data.length; i++) {
@@ -1465,8 +1465,8 @@ export class NDArray<T extends DType = 'float64'> {
      * a.max(0) // NDArray([3, 4]) (column maxs)
      * a.max(1) // NDArray([2, 4]) (row maxs)
      */
-    max(axis?: number | null): NDArray<T> | number {
-        if (axis === undefined || axis === null) {
+    max(axis?: number): NDArray<T> | number {
+        if (axis === undefined) {
             // Max of all elements
             let maxValue = -Infinity;
             for (let i = 0; i < this.data.length; i++) {
