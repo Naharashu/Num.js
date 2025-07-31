@@ -96,7 +96,7 @@ function applyUnaryKernel<T extends DType>(arr: NDArray<T>, fn: UnaryScalarFunct
   for (let i = 0; i < size; i++) {
     resultArray[i] = resultData[i];
   }
-  return new NDArray<T>(resultArray, arr.shape, arr.dtype, 0, undefined, false);
+  return new NDArray<T>(resultArray, arr.shape, arr.dtype);
 }
 
 /**
@@ -174,7 +174,7 @@ function applyBinaryScalarKernel<T extends DType>(
   for (let i = 0; i < size; i++) {
     resultArray[i] = resultData[i];
   }
-  return new NDArray<T>(resultArray, arr.shape, arr.dtype, 0, undefined, false);
+  return new NDArray<T>(resultArray, arr.shape, arr.dtype);
 }
 
 // ============================================================================
@@ -501,7 +501,7 @@ export function any(arr: NDArray, axis?: number): boolean | NDArray {
   }
   
   // Axis-wise reduction - for now, throw error as this requires more complex implementation
-  throw new InvalidParameterError('axis', 'undefined (axis-wise reduction not yet implemented)', axis);
+  throw new InvalidParameterError('axis', 'number or undefined', axis, 'axis-wise reduction not yet implemented');
 }
 
 /**
@@ -523,7 +523,7 @@ export function all(arr: NDArray, axis?: number): boolean | NDArray {
   }
   
   // Axis-wise reduction - for now, throw error as this requires more complex implementation
-  throw new InvalidParameterError('axis', 'undefined (axis-wise reduction not yet implemented)', axis);
+  throw new InvalidParameterError('axis', 'number or undefined', axis, 'axis-wise reduction not yet implemented');
 }
 
 // ============================================================================
@@ -548,7 +548,7 @@ export function toBooleanArray<T extends DType>(arr: NDArray<T>): NDArray<T> {
   for (let i = 0; i < arr.size; i++) {
     resultArray[i] = resultData[i];
   }
-  return new NDArray<T>(resultArray, arr.shape, arr.dtype, 0, undefined, false);
+  return new NDArray<T>(resultArray, arr.shape, arr.dtype);
 }
 
 /**
@@ -626,7 +626,7 @@ export function where<T extends DType>(condition: NDArray<T>, x: NDArray<T> | nu
   for (let i = 0; i < condition.size; i++) {
     resultArray[i] = resultData[i];
   }
-  return new NDArray<T>(resultArray, condition.shape, condition.dtype, 0, undefined, false);
+  return new NDArray<T>(resultArray, condition.shape, condition.dtype);
 }
 
 // Mark all exported ufuncs
@@ -766,7 +766,7 @@ export function multiplyAddKernel<T extends DType>(a: NDArray<T>, b: NDArray<T> 
   for (let i = 0; i < size; i++) {
     resultArray[i] = resultData[i];
   }
-  return new NDArray<T>(resultArray, a.shape, a.dtype, 0, undefined, false);
+  return new NDArray<T>(resultArray, a.shape, a.dtype);
 }
 
 /**
@@ -795,5 +795,5 @@ export function addMultiplyKernel<T extends DType>(a: NDArray<T>, b: NDArray<T> 
   for (let i = 0; i < size; i++) {
     resultArray[i] = resultData[i];
   }
-  return new NDArray<T>(resultArray, a.shape, a.dtype, 0, undefined, false);
+  return new NDArray<T>(resultArray, a.shape, a.dtype);
 }

@@ -51,14 +51,14 @@ export function getShape(arr: NumericArray | NumericMatrix | Numeric3D): Shape {
   if (Array.isArray(arr[0]) && typeof arr[0]?.[0] === 'number') {
     const matrix = arr as NumericMatrix;
     validateNumericMatrix(matrix, 'arr');
-    return [matrix.length, matrix[0]!.length];
+    return [matrix.length, matrix[0]?.length ?? 0];
   }
   
   // Check if it's a 3D array
   if (Array.isArray(arr[0]) && Array.isArray(arr[0]?.[0]) && typeof arr[0]?.[0]?.[0] === 'number') {
     const array3d = arr as Numeric3D;
     validateNumeric3DArray(array3d, 'arr');
-    return [array3d.length, array3d[0]!.length, array3d[0]![0]!.length];
+    return [array3d.length, array3d[0]?.length ?? 0, array3d[0]?.[0]?.length ?? 0];
   }
   
   throw new InvalidParameterError('arr', 'numeric array (1D, 2D, or 3D)', arr);
