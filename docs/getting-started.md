@@ -181,7 +181,7 @@ const loss = mse(actual, predicted);     // Mean squared error
 - 🐛 Report issues on [GitHub](https://github.com/naharashu/num.js/issues)
 
 
-Thanks RedWilly for rewriting library in TypeScripy ❤️
+Thanks RedWilly for rewriting library in TypeScript ❤️
 
 ---
 
