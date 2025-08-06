@@ -1,0 +1,270 @@
+/**
+ * Common type definitions for Num.js TypeScript migration
+ * These types provide the foundation for type-safe mathematical operations
+ */
+
+// ============================================================================
+// Basic Numeric Types
+// ============================================================================
+
+/** Base numeric type - always a finite number for mathematical operations */
+export type Numeric = number;
+
+/** One-dimensional array of numbers */
+export type NumericArray = number[];
+
+/** Two-dimensional array of numbers (matrix) */
+export type NumericMatrix = number[][];
+
+/** Three-dimensional array of numbers */
+export type Numeric3D = number[][][];
+
+/** Union type for all numeric array types */
+export type NumericArrayLike = NumericArray | NumericMatrix | Numeric3D;
+
+// ============================================================================
+// Shape and Dimension Types
+// ============================================================================
+
+/** Readonly array representing the shape of an n-dimensional array */
+export type Shape = readonly number[];
+
+/** Axis parameter - null means operate on entire array, number specifies axis */
+export type Axis = number | null;
+
+/** Information about array dimensions */
+export interface Dimensions {
+    /** Shape of the array (e.g., [3, 4] for 3x4 matrix) */
+    readonly shape: Shape;
+    /** Number of dimensions */
+    readonly ndim: number;
+    /** Total number of elements */
+    readonly size: number;
+}
+
+
+// ============================================================================
+// Data Type (dtype) System
+// ============================================================================
+
+/**
+ * Supported data types for NDArray.
+ */
+export type DType =
+  | 'float64'
+  | 'float32'
+  | 'int32'
+  | 'int16'
+  | 'int8'
+  | 'uint32'
+  | 'uint16'
+  | 'uint8'
+  | 'uint8c' // Clamped
+  | 'bool'; // Represented by Uint8Array
+
+/**
+ * Union of all supported TypedArray types.
+ */
+export type TypedArray =
+  | Float64Array
+  | Float32Array
+  | Int32Array
+  | Int16Array
+  | Int8Array
+  | Uint32Array
+  | Uint16Array
+  | Uint8Array
+  | Uint8ClampedArray;
+
+/**
+ * Maps a DType string to its corresponding TypedArray instance type.
+ * This is crucial for generic type safety.
+ */
+export interface DTypeMap {
+  float64: Float64Array;
+  float32: Float32Array;
+  int32: Int32Array;
+  int16: Int16Array;
+  int8: Int8Array;
+  uint32: Uint32Array;
+  uint16: Uint16Array;
+  uint8: Uint8Array;
+  uint8c: Uint8ClampedArray;
+  bool: Uint8Array;
+}
+
+/**
+ * Represents a constructor for a TypedArray.
+ */
+export type TypedArrayConstructor<T extends TypedArray> = new (
+  bufferOrLength?: number | ArrayBufferLike
+) => T;
+
+/**
+ * Runtime mapping from DType string to TypedArray constructor.
+ */
+export const DTYPE_CONSTRUCTORS: { [K in DType]: TypedArrayConstructor<DTypeMap[K]> } = {
+  float64: Float64Array,
+  float32: Float32Array,
+  int32: Int32Array,
+  int16: Int16Array,
+  int8: Int8Array,
+  uint32: Uint32Array,
+  uint16: Uint16Array,
+  uint8: Uint8Array,
+  uint8c: Uint8ClampedArray,
+  bool: Uint8Array,
+};
+
+// ============================================================================
+// Statistical Function Options
+// ============================================================================
+
+/** Options for statistical functions */
+export interface StatisticalOptions {
+    /** Axis along which to operate (null for entire array) */
+    readonly axis?: Axis;
+    /** Delta degrees of freedom for variance/std calculations */
+    readonly ddof?: number;
+}
+
+/** Options for array comparison functions */
+export interface ComparisonOptions {
+    /** Relative tolerance for floating point comparison */
+    readonly rtol?: number;
+    /** Absolute tolerance for floating point comparison */
+    readonly atol?: number;
+}
+
+// ============================================================================
+// Complex Number Support
+// ============================================================================
+
+/** Complex number representation */
+export interface ComplexNumber {
+    /** Real part */
+    readonly real: number;
+    /** Imaginary part */
+    readonly imag: number;
+}
+
+/** Array of complex numbers */
+export type ComplexArray = ComplexNumber[];
+
+/** Matrix of complex numbers */
+export type ComplexMatrix = ComplexNumber[][];
+
+// ============================================================================
+// Function Type Definitions
+// ============================================================================
+
+/** Function that operates on a single number */
+export type UnaryFunction = (x: number) => number;
+
+/** Function that operates on two numbers */
+export type BinaryFunction = (x: number, y: number) => number;
+
+/** Function that operates on an array of numbers */
+export type ArrayFunction<T = number> = (arr: readonly number[]) => T;
+
+/** Function that operates element-wise on arrays */
+export type ElementWiseFunction = (arr: readonly number[]) => number[];
+
+// ============================================================================
+// Utility Types
+// ============================================================================
+
+/** Type guard for checking if value is a finite number */
+export type FiniteNumber = number & { __brand: 'finite' };
+
+/** Options for random number generation */
+export interface RandomOptions {
+    /** Random seed for reproducibility */
+    readonly seed?: number;
+    /** Size/shape of output array */
+    readonly size?: number | Shape;
+}
+
+/** Range specification for various operations */
+export interface Range {
+    /** Start value (inclusive) */
+    readonly start: number;
+    /** End value (exclusive) */
+    readonly end: number;
+    /** Step size */
+    readonly step?: number;
+}
+
+// ============================================================================
+// Matrix Operation Types
+// ============================================================================
+
+/** Supported matrix norms */
+export type MatrixNorm = 'fro' | 1 | -1 | 2 | -2 | number;
+
+/** Vector norms */
+export type VectorNorm = 1 | 2 | number;
+
+/** Matrix decomposition results */
+export interface QRDecomposition {
+    readonly Q: NumericMatrix;
+    readonly R: NumericMatrix;
+}
+
+export interface SVDDecomposition {
+    readonly U: NumericMatrix;
+    readonly S: NumericArray;
+    readonly Vt: NumericMatrix;
+}
+
+export interface EigenDecomposition {
+    readonly eigenvalues: NumericArray;
+    readonly eigenvectors: NumericMatrix;
+}
+
+// ============================================================================
+// Type Guards and Validation
+// ============================================================================
+
+/** Type predicate for finite numbers */
+export function isFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** Type predicate for numeric arrays */
+export function isNumericArray(value: unknown): value is NumericArray {
+    return Array.isArray(value) && value.every(isFiniteNumber);
+}
+
+/** Type predicate for numeric matrices */
+export function isNumericMatrix(value: unknown): value is NumericMatrix {
+    if (!Array.isArray(value) || value.length === 0) return false;
+
+    const firstRowLength = value[0]?.length;
+    if (typeof firstRowLength !== 'number' || firstRowLength === 0) return false;
+
+    return value.every(row =>
+        Array.isArray(row) &&
+        row.length === firstRowLength &&
+        row.every(isFiniteNumber)
+    );
+}
+
+/** Type predicate for complex numbers */
+export function isComplexNumber(value: unknown): value is ComplexNumber {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        'real' in value &&
+        'imag' in value &&
+        isFiniteNumber((value as ComplexNumber).real) &&
+        isFiniteNumber((value as ComplexNumber).imag)
+    );
+}
+
+// ============================================================================
+// Constants (Re-exported from constants.ts for convenience)
+// ============================================================================
+
+// Re-export the comprehensive MATH_CONSTANTS from constants.ts
+export { MATH_CONSTANTS } from '../core/constants.js';
